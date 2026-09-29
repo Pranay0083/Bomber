@@ -36,10 +36,11 @@ public final class Ui {
         return GLYPHS.width;
     }
 
-    /** As {@link #text}, with a dark copy one font-pixel down and to the right behind it. */
+    /** As {@link #text}, with a dark copy a few pixels down and to the right behind it. */
     public static float shadowText(SpriteBatch batch, BitmapFont font, String text, float scale, Color colour,
                                    float x, float centreY, Align align) {
-        text(batch, font, text, scale, SHADOW, x + scale, centreY - scale, align);
+        float offset = Math.min(scale, 3f);
+        text(batch, font, text, scale, SHADOW, x + offset, centreY - offset, align);
         return text(batch, font, text, scale, colour, x, centreY, align);
     }
 

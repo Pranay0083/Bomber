@@ -217,7 +217,7 @@ public final class GameScreen extends ScreenAdapter {
         hudRenderer.draw(engine.view(),
                 new MatchHud(match.currentRound(), match.bestOf(), match.scores(), paused, match.winner(),
                         sounds.isMuted()),
-                camera.combined);
+                delta, camera.combined);
     }
 
     @Override
