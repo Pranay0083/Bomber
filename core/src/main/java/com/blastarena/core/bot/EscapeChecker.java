@@ -6,6 +6,7 @@ import com.blastarena.core.control.WorldView;
 import com.blastarena.core.model.Position;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Tries out a bomb before it is placed: pretends it is on the board and checks that a safe tile can still be
@@ -34,9 +35,15 @@ public final class EscapeChecker {
      * The tick spent placing the bomb delays the first step by one.
      */
     public Optional<List<Position>> escapeRoute(WorldView view, PlayerSnapshot player, Position at, DangerMap withBomb) {
+        return escapeRoute(view, player, at, withBomb, position -> !withBomb.isThreatened(position));
+    }
+
+    /** As above, but only tiles matching {@code refuge} count as safe; it should exclude every threatened tile. */
+    public Optional<List<Position>> escapeRoute(WorldView view, PlayerSnapshot player, Position at, DangerMap withBomb,
+                                                Predicate<Position> refuge) {
         PathFinder.Pace pace = new PathFinder.Pace(
                 Math.max(2, player.moveCooldown()), player.stats().moveDelayTicks());
-        return pathFinder.find(view, withBomb, at, pace, position -> !withBomb.isThreatened(position), MAX_ESCAPE_STEPS);
+        return pathFinder.find(view, withBomb, at, pace, refuge, MAX_ESCAPE_STEPS);
     }
 
     public boolean canEscapeAfterPlacing(WorldView view, PlayerSnapshot player, Position at) {
