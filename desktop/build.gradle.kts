@@ -33,3 +33,23 @@ application {
         applicationDefaultJvmArgs = listOf("-XstartOnFirstThread")
     }
 }
+
+// One jar with the game and everything it needs: ./gradlew :desktop:dist, then java -jar on the result.
+val dist = tasks.register<Jar>("dist") {
+    description = "Builds a single runnable jar of the game."
+    group = "distribution"
+    archiveBaseName = "blast-arena"
+    archiveVersion = project.version.toString()
+    destinationDirectory = layout.buildDirectory.dir("dist")
+    manifest {
+        attributes("Main-Class" to application.mainClass.get())
+    }
+    from(sourceSets.main.get().output)
+    dependsOn(configurations.runtimeClasspath)
+    from({
+        configurations.runtimeClasspath.get().filter { it.exists() }.map { if (it.isDirectory) it else zipTree(it) }
+    })
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Signature files from dependencies would make the merged jar fail verification.
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/INDEX.LIST")
+}

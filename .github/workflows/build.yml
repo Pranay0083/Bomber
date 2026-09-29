@@ -15,4 +15,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6
-      - run: ./gradlew build :core:soakTest
+      - run: ./gradlew build :core:soakTest :desktop:dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: blast-arena-jar
+          path: desktop/build/dist/*.jar
