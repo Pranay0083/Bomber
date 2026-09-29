@@ -89,9 +89,9 @@ class GameWorldTest {
         GameWorld world = AsciiWorld.parse("1B.");
         world.explode(world.bombs().getFirst(), new Fire(Set.of(new Position(1, 0)), 2));
 
-        world.tickFires();
+        world.tickFires(world.fires());
         assertThat(world.fires()).hasSize(1);
-        world.tickFires();
+        world.tickFires(world.fires());
         assertThat(world.fires()).isEmpty();
     }
 

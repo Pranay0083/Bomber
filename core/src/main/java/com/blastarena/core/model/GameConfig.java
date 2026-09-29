@@ -9,7 +9,8 @@ package com.blastarena.core.model;
  * @param fireTicks        ticks that fire stays on its tiles
  * @param dropChance       chance, from 0 to 1, that a destroyed crate drops a power-up
  * @param crateDensity     share, from 0 to 1, of free cells that start with a crate
- * @param roundLengthTicks ticks before sudden death starts
+ * @param roundLengthTicks ticks of play before sudden death starts
+ * @param countdownTicks   ticks of countdown before play starts; 0 starts straight away
  * @param seed             seed for every random choice, so a round can be replayed exactly
  */
 public record GameConfig(
@@ -20,6 +21,7 @@ public record GameConfig(
         double dropChance,
         double crateDensity,
         int roundLengthTicks,
+        int countdownTicks,
         long seed) {
 
     public static final int TICKS_PER_SECOND = 20;
@@ -34,6 +36,9 @@ public record GameConfig(
         requirePositive("Fuse ticks", fuseTicks);
         requirePositive("Fire ticks", fireTicks);
         requirePositive("Round length ticks", roundLengthTicks);
+        if (countdownTicks < 0) {
+            throw new IllegalArgumentException("Countdown ticks must not be negative, was " + countdownTicks);
+        }
         requireFraction("Drop chance", dropChance);
         requireFraction("Crate density", crateDensity);
     }
@@ -70,6 +75,7 @@ public record GameConfig(
         private double dropChance = 0.3;
         private double crateDensity = 0.7;
         private int roundLengthTicks = 2 * 60 * TICKS_PER_SECOND;
+        private int countdownTicks = 3 * TICKS_PER_SECOND;
         private long seed = 0L;
 
         private Builder() {
@@ -110,13 +116,19 @@ public record GameConfig(
             return this;
         }
 
+        public Builder countdownTicks(int countdownTicks) {
+            this.countdownTicks = countdownTicks;
+            return this;
+        }
+
         public Builder seed(long seed) {
             this.seed = seed;
             return this;
         }
 
         public GameConfig build() {
-            return new GameConfig(width, height, fuseTicks, fireTicks, dropChance, crateDensity, roundLengthTicks, seed);
+            return new GameConfig(
+                    width, height, fuseTicks, fireTicks, dropChance, crateDensity, roundLengthTicks, countdownTicks, seed);
         }
     }
 }

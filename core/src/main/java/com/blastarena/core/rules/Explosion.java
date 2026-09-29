@@ -2,6 +2,8 @@ package com.blastarena.core.rules;
 
 import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.model.Position;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -15,9 +17,10 @@ import java.util.Set;
  */
 public record Explosion(Bomb bomb, Set<Position> fireTiles, Set<Position> cratesHit, List<Bomb> triggered) {
 
+    /** Sets keep the order the blast reached each tile, so anything built from them is deterministic. */
     public Explosion {
-        fireTiles = Set.copyOf(fireTiles);
-        cratesHit = Set.copyOf(cratesHit);
+        fireTiles = Collections.unmodifiableSet(new LinkedHashSet<>(fireTiles));
+        cratesHit = Collections.unmodifiableSet(new LinkedHashSet<>(cratesHit));
         triggered = List.copyOf(triggered);
     }
 }

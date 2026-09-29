@@ -10,6 +10,7 @@ import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -124,8 +125,24 @@ public final class GameWorld {
         board.setTile(position, destructible.destroy());
     }
 
-    public void tickFires() {
-        fires.forEach(Fire::tick);
+    public void tickCooldowns() {
+        livingPlayers().forEach(Player::tickCooldown);
+    }
+
+    public void tickBombs() {
+        bombs.forEach(Bomb::tick);
+    }
+
+    /**
+     * Counts down the given fires and removes any that burned out. The engine passes the fires that existed
+     * before this tick's explosions, so new fire burns for its full duration.
+     */
+    public void tickFires(Collection<Fire> existing) {
+        existing.forEach(Fire::tick);
         fires.removeIf(Fire::isExpired);
+    }
+
+    public void killPlayer(Player player) {
+        player.kill();
     }
 }
