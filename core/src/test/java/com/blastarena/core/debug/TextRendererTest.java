@@ -42,6 +42,13 @@ class TextRendererTest {
     }
 
     @Test
+    void drawsPowerUps() {
+        GameEngine engine = engineFor(GameConfig.builder().build(), "1brs2");
+
+        assertThat(renderer.render(engine.view())).isEqualTo("1brs2\n");
+    }
+
+    @Test
     void drawsFireAroundAnExplodedBomb() {
         GameEngine engine = engineFor(GameConfig.builder().countdownTicks(0).fuseTicks(1).build(),
                 "1.B.2",

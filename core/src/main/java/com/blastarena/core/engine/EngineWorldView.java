@@ -7,11 +7,16 @@ import com.blastarena.core.control.WorldView;
 import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.entity.Fire;
 import com.blastarena.core.entity.Player;
+import com.blastarena.core.entity.PowerUpDrop;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
+import com.blastarena.core.powerup.PowerUpType;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -82,6 +87,20 @@ final class EngineWorldView implements WorldView {
     @Override
     public Optional<BombSnapshot> bombAt(Position position) {
         return world.bombAt(position).map(EngineWorldView::snapshot);
+    }
+
+    @Override
+    public Optional<PowerUpType> powerUpAt(Position position) {
+        return world.dropAt(position).map(drop -> drop.powerUp().type());
+    }
+
+    @Override
+    public Map<Position, PowerUpType> powerUps() {
+        Map<Position, PowerUpType> powerUps = new LinkedHashMap<>();
+        for (PowerUpDrop drop : world.drops()) {
+            powerUps.put(drop.position(), drop.powerUp().type());
+        }
+        return Collections.unmodifiableMap(powerUps);
     }
 
     @Override

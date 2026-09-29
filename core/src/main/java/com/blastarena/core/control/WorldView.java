@@ -5,7 +5,9 @@ import com.blastarena.core.engine.GamePhase;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
+import com.blastarena.core.powerup.PowerUpType;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -39,6 +41,11 @@ public interface WorldView {
     List<BombSnapshot> bombs();
 
     Optional<BombSnapshot> bombAt(Position position);
+
+    Optional<PowerUpType> powerUpAt(Position position);
+
+    /** Power-ups on the floor, in the order they appeared. */
+    Map<Position, PowerUpType> powerUps();
 
     boolean isBurning(Position position);
 
