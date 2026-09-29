@@ -50,4 +50,10 @@ public interface WorldView {
     boolean isBurning(Position position);
 
     Set<Position> burningTiles();
+
+    /**
+     * How long fire on this tile has left, or 0 if it is not burning. A player on a tile with {@code n} ticks left
+     * dies if still there at the end of any of the next {@code n - 1} ticks.
+     */
+    int fireTicksLeft(Position position);
 }

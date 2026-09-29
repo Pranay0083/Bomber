@@ -11,8 +11,9 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.blastarena.core.board.Board;
 import com.blastarena.core.board.MapGenerator;
+import com.blastarena.core.bot.BotController;
+import com.blastarena.core.bot.Difficulty;
 import com.blastarena.core.control.Controller;
-import com.blastarena.core.control.IdleController;
 import com.blastarena.core.engine.GameEngine;
 import com.blastarena.core.engine.GameWorld;
 import com.blastarena.core.event.SynchronousEventPublisher;
@@ -32,7 +33,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Plays rounds: runs the engine on a fixed 50 ms tick and draws the world every frame.
- * Player 1 is on the keyboard. R starts a new round once one is over; Esc quits.
+ * Player 1 is on the keyboard against three Medium bots. R starts a new round once one is over; Esc quits.
  */
 public final class GameScreen extends ScreenAdapter {
 
@@ -86,7 +87,8 @@ public final class GameScreen extends ScreenAdapter {
         Map<PlayerId, Controller> controllers = new HashMap<>();
         controllers.put(HUMAN, keyboard);
         for (int id = 2; id <= PLAYER_COUNT; id++) {
-            controllers.put(new PlayerId(id), new IdleController(new PlayerId(id)));
+            PlayerId bot = new PlayerId(id);
+            controllers.put(bot, BotController.of(Difficulty.MEDIUM, bot, config.seed() + id));
         }
         Gdx.input.setInputProcessor(new InputMultiplexer(screenKeys, keyboard));
         SynchronousEventPublisher publisher = new SynchronousEventPublisher();

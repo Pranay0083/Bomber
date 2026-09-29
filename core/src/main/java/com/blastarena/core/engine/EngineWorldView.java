@@ -117,6 +117,17 @@ final class EngineWorldView implements WorldView {
         return Set.copyOf(burning);
     }
 
+    @Override
+    public int fireTicksLeft(Position position) {
+        int left = 0;
+        for (Fire fire : world.fires()) {
+            if (fire.covers(position)) {
+                left = Math.max(left, fire.remainingTicks());
+            }
+        }
+        return left;
+    }
+
     private static PlayerSnapshot snapshot(Player player) {
         return new PlayerSnapshot(
                 player.id(),
