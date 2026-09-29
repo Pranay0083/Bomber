@@ -1,10 +1,7 @@
 package com.blastarena.desktop.render;
 
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Disposable;
 import com.blastarena.core.board.Crate;
@@ -15,15 +12,22 @@ import com.blastarena.core.control.PlayerSnapshot;
 import com.blastarena.core.control.WorldView;
 import com.blastarena.core.model.Position;
 import com.blastarena.core.powerup.PowerUpType;
+import java.util.List;
 import java.util.Map;
 
-/** Draws the board and everything on it as coloured shapes. */
+/**
+ * Draws the board and everything on it with the pixel-art sprites. Fire plays a four-frame explosion over its
+ * lifetime, bombs flicker and flash red before they go, and tiles about to be walled in by sudden death are
+ * striped red.
+ */
 public final class BoardRenderer implements Disposable {
 
-    private final ShapeRenderer shapes = new ShapeRenderer();
+    /** Sudden-death walls this close are shown as a warning. */
+    private static final int WARNING_TICKS = 20;
+    private static final Sprite[] FIRE_FRAMES = {Sprite.FIRE_0, Sprite.FIRE_1, Sprite.FIRE_2, Sprite.FIRE_3};
+
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
-    private final GlyphLayout glyphs = new GlyphLayout();
+    private final SpriteSheet sheet = new SpriteSheet();
     private final Layout layout;
 
     public BoardRenderer(Layout layout) {
@@ -31,20 +35,15 @@ public final class BoardRenderer implements Disposable {
     }
 
     public void draw(WorldView view, PlayerPlacement placement, Matrix4 projection) {
-        shapes.setProjectionMatrix(projection);
         batch.setProjectionMatrix(projection);
-
-        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        batch.begin();
         drawTiles(view);
+        drawWallWarnings(view);
         drawPowerUps(view);
         drawBombs(view);
         drawFire(view);
         drawPlayers(view, placement);
-        shapes.end();
-
-        batch.begin();
-        drawPowerUpLetters(view);
-        drawPlayerNumbers(view, placement);
+        batch.setColor(Color.WHITE);
         batch.end();
     }
 
@@ -55,45 +54,58 @@ public final class BoardRenderer implements Disposable {
                 float left = layout.screenX(x);
                 float bottom = layout.screenY(y);
                 switch (view.tileAt(new Position(x, y))) {
-                    case Floor floor -> TileArt.floor(shapes, left, bottom, size, x, y);
-                    case SolidWall wall -> TileArt.wall(shapes, left, bottom, size);
-                    case Crate crate -> TileArt.crate(shapes, left, bottom, size, x, y);
+                    case Floor floor -> TileArt.floor(batch, sheet, left, bottom, size, x, y);
+                    case SolidWall wall -> TileArt.wall(batch, sheet, left, bottom, size);
+                    case Crate crate -> TileArt.crate(batch, sheet, left, bottom, size);
                 }
             }
         }
     }
 
+    private void drawWallWarnings(WorldView view) {
+        int next = view.ticksUntilNextWall();
+        int interval = view.config().suddenDeathIntervalTicks();
+        List<Position> walls = view.upcomingWalls();
+        for (int i = 0; i < walls.size() && (long) next + (long) i * interval <= WARNING_TICKS; i++) {
+            Position wall = walls.get(i);
+            TileArt.draw(batch, sheet, Sprite.WARNING, layout.screenX(wall.x()), layout.screenY(wall.y()),
+                    layout.tileSize());
+        }
+    }
+
     private void drawPowerUps(WorldView view) {
-        float size = layout.tileSize();
         for (Map.Entry<Position, PowerUpType> entry : view.powerUps().entrySet()) {
-            TileArt.powerUp(shapes, layout.screenX(entry.getKey().x()), layout.screenY(entry.getKey().y()), size,
-                    entry.getValue());
+            TileArt.powerUp(batch, sheet, layout.screenX(entry.getKey().x()), layout.screenY(entry.getKey().y()),
+                    layout.tileSize(), entry.getValue());
         }
     }
 
     private void drawBombs(WorldView view) {
         float size = layout.tileSize();
         for (BombSnapshot bomb : view.bombs()) {
-            float cx = layout.screenX(bomb.position().x()) + size / 2;
-            float cy = layout.screenY(bomb.position().y()) + size / 2;
-            float pulse = 1f + 0.06f * (float) Math.sin(bomb.remainingFuse() * 0.6);
-            boolean aboutToBlow = bomb.remainingFuse() <= 10 && bomb.remainingFuse() % 4 < 2;
-            shapes.setColor(aboutToBlow ? Palette.BOMB_FLASH : Palette.BOMB);
-            shapes.circle(cx, cy - 2, size * 0.34f * pulse, 32);
-            shapes.setColor(Palette.BOMB_SHINE);
-            shapes.circle(cx - size * 0.11f, cy + size * 0.1f, size * 0.07f, 16);
+            int fuse = bomb.remainingFuse();
+            boolean aboutToBlow = fuse <= 10 && fuse % 4 < 2;
+            float scale = 1f + 0.06f * (float) Math.sin(fuse * 0.6) + (aboutToBlow ? 0.08f : 0f);
+            float drawn = size * scale;
+            float left = layout.screenX(bomb.position().x()) - (drawn - size) / 2;
+            float bottom = layout.screenY(bomb.position().y()) - (drawn - size) / 2;
+            batch.setColor(aboutToBlow ? Palette.BOMB_FLASH : Color.WHITE);
+            batch.draw(sheet.get((fuse / 3) % 2 == 0 ? Sprite.BOMB_0 : Sprite.BOMB_1), left, bottom, drawn, drawn);
         }
+        batch.setColor(Color.WHITE);
     }
 
+    /** The explosion animation: which frame depends on how far through its life the fire is. */
     private void drawFire(WorldView view) {
+        int lifetime = view.config().fireTicks();
         float size = layout.tileSize();
         for (Position position : view.burningTiles()) {
-            float left = layout.screenX(position.x());
-            float bottom = layout.screenY(position.y());
-            shapes.setColor(Palette.FIRE_OUTER);
-            shapes.rect(left + 2, bottom + 2, size - 4, size - 4);
-            shapes.setColor(Palette.FIRE_INNER);
-            shapes.rect(left + size * 0.25f, bottom + size * 0.25f, size * 0.5f, size * 0.5f);
+            int age = Math.max(0, lifetime - view.fireTicksLeft(position));
+            int frame = Math.min(FIRE_FRAMES.length - 1, age * FIRE_FRAMES.length / lifetime);
+            // Fire slightly larger than its tile so neighbouring flames merge into one blast.
+            float grow = size * 0.12f;
+            batch.draw(sheet.get(FIRE_FRAMES[frame]), layout.screenX(position.x()) - grow / 2,
+                    layout.screenY(position.y()) - grow / 2, size + grow, size + grow);
         }
     }
 
@@ -104,47 +116,15 @@ public final class BoardRenderer implements Disposable {
                 continue;
             }
             float[] at = placement.tileCoordinates(player);
-            float cx = layout.screenX(at[0]) + size / 2;
-            float cy = layout.screenY(at[1]) + size / 2;
-            shapes.setColor(Color.BLACK);
-            shapes.circle(cx, cy, size * 0.36f, 32);
-            shapes.setColor(Palette.player(player.id()));
-            shapes.circle(cx, cy, size * 0.32f, 32);
+            batch.setColor(Palette.player(player.id()));
+            batch.draw(sheet.get(Sprite.PLAYER), layout.screenX(at[0]), layout.screenY(at[1]), size, size);
         }
-    }
-
-    private void drawPowerUpLetters(WorldView view) {
-        float size = layout.tileSize();
-        font.getData().setScale(1.3f);
-        font.setColor(Palette.POWER_UP_BASE);
-        for (Map.Entry<Position, PowerUpType> entry : view.powerUps().entrySet()) {
-            drawCentred(TileArt.powerUpLetter(entry.getValue()), layout.screenX(entry.getKey().x()) + size / 2,
-                    layout.screenY(entry.getKey().y()) + size / 2);
-        }
-    }
-
-    private void drawPlayerNumbers(WorldView view, PlayerPlacement placement) {
-        float size = layout.tileSize();
-        font.getData().setScale(1.4f);
-        font.setColor(Color.BLACK);
-        for (PlayerSnapshot player : view.players()) {
-            if (player.alive()) {
-                float[] at = placement.tileCoordinates(player);
-                drawCentred(Integer.toString(player.id().id()),
-                        layout.screenX(at[0]) + size / 2, layout.screenY(at[1]) + size / 2);
-            }
-        }
-    }
-
-    private void drawCentred(String text, float cx, float cy) {
-        glyphs.setText(font, text);
-        font.draw(batch, glyphs, cx - glyphs.width / 2, cy + glyphs.height / 2);
+        batch.setColor(Color.WHITE);
     }
 
     @Override
     public void dispose() {
-        shapes.dispose();
         batch.dispose();
-        font.dispose();
+        sheet.dispose();
     }
 }
