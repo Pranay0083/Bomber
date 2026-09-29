@@ -129,4 +129,30 @@ class DangerMapTest {
         assertThat(danger.isDeadlyAt(new Position(2, 0), 1)).isTrue();
         assertThat(danger.ticksUntilFire(new Position(4, 0))).isEqualTo(1);
     }
+
+    @Test
+    void fireAlreadyBurningIsOnlyDeadlyUntilItBurnsOut() {
+        var engine = BotWorlds.engine("1.B...");
+        for (int i = 0; i < 10; i++) {
+            engine.tick();
+        }
+        // The bomb went off on tick 10 with 3 ticks of fire: it is still there at the end of ticks 11 and 12.
+        WorldView view = engine.view();
+        DangerMap danger = DangerMap.of(view);
+        Position burning = new Position(3, 0);
+
+        assertThat(view.fireTicksLeft(burning)).isEqualTo(3);
+        assertThat(danger.isDeadlyAt(burning, 2)).isTrue();
+        assertThat(danger.isDeadlyAt(burning, 3)).isFalse();
+        assertThat(danger.isDeadlyFrom(burning, 3)).isFalse();
+
+        engine.tick();
+        engine.tick();
+        // One tick left: still drawn as burning, but gone before the next kill check.
+        assertThat(engine.view().fireTicksLeft(burning)).isEqualTo(1);
+        assertThat(DangerMap.of(engine.view()).isBurning(burning)).isTrue();
+        assertThat(DangerMap.of(engine.view()).isDeadlyAt(burning, 1)).isFalse();
+        engine.tick();
+        assertThat(engine.view().burningTiles()).isEmpty();
+    }
 }

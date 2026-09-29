@@ -31,6 +31,8 @@ public final class DangerMap {
     private final int fireTicks;
     private final int[] fireIn;
     private final boolean[] burning;
+    /** For fire burning now: the last tick (from now) at whose end it is still there; 0 if it goes out next tick. */
+    private final int[] burningUntil;
 
     private DangerMap(int width, int height, int fireTicks) {
         this.width = width;
@@ -38,6 +40,7 @@ public final class DangerMap {
         this.fireTicks = fireTicks;
         this.fireIn = new int[width * height];
         this.burning = new boolean[width * height];
+        this.burningUntil = new int[width * height];
         Arrays.fill(fireIn, NEVER);
     }
 
@@ -49,7 +52,9 @@ public final class DangerMap {
     public static DangerMap of(WorldView view, List<BombSnapshot> extraBombs) {
         DangerMap map = new DangerMap(view.width(), view.height(), view.config().fireTicks());
         for (Position position : view.burningTiles()) {
+            // Fire with n ticks left is still there at the end of the next n - 1 ticks.
             map.burning[map.index(position)] = true;
+            map.burningUntil[map.index(position)] = Math.max(0, view.fireTicksLeft(position) - 1);
         }
         List<BombSnapshot> bombs = new ArrayList<>(view.bombs());
         bombs.addAll(extraBombs);
@@ -64,7 +69,7 @@ public final class DangerMap {
         for (int i = 0; i < bombs.size(); i++) {
             BombSnapshot bomb = bombs.get(i);
             bombAt.put(bomb.position(), i);
-            explodeIn[i] = burning[index(bomb.position())] ? 1 : Math.max(1, bomb.remainingFuse());
+            explodeIn[i] = isBurning(bomb.position()) ? 1 : Math.max(1, bomb.remainingFuse());
         }
         int[] crateGoneAt = new int[width * height];
         Arrays.fill(crateGoneAt, NEVER);
@@ -148,8 +153,7 @@ public final class DangerMap {
         if (last < first) {
             return false;
         }
-        // Fire burning now may have just started, so assume it lasts the full duration.
-        if (isBurning(position) && first < fireTicks) {
+        if (first <= burningUntil[index(position)]) {
             return true;
         }
         int start = ticksUntilFire(position);
