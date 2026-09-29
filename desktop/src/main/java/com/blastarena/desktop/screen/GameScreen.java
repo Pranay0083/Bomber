@@ -213,7 +213,7 @@ public final class GameScreen extends ScreenAdapter {
         }
         ScreenUtils.clear(Palette.BACKGROUND);
         viewport.apply();
-        boardRenderer.draw(engine.view(), animation.placement(paused ? 0f : clock.alpha()), camera.combined);
+        boardRenderer.draw(engine.view(), animation, paused ? 0f : clock.alpha(), paused ? 0f : delta, camera.combined);
         hudRenderer.draw(engine.view(),
                 new MatchHud(match.currentRound(), match.bestOf(), match.scores(), paused, match.winner(),
                         sounds.isMuted()),
