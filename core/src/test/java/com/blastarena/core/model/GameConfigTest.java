@@ -20,6 +20,7 @@ class GameConfigTest {
         assertThat(config.dropChance()).isEqualTo(0.3);
         assertThat(config.crateDensity()).isEqualTo(0.7);
         assertThat(config.roundLengthTicks()).isEqualTo(2400);
+        assertThat(config.countdownTicks()).isEqualTo(60);
     }
 
     @Test
@@ -55,5 +56,6 @@ class GameConfigTest {
         assertThatIllegalArgumentException().isThrownBy(() -> GameConfig.builder().fuseTicks(0).build());
         assertThatIllegalArgumentException().isThrownBy(() -> GameConfig.builder().fireTicks(0).build());
         assertThatIllegalArgumentException().isThrownBy(() -> GameConfig.builder().roundLengthTicks(0).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> GameConfig.builder().countdownTicks(-1).build());
     }
 }
