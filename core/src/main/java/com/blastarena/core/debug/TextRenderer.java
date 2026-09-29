@@ -6,11 +6,14 @@ import com.blastarena.core.board.SolidWall;
 import com.blastarena.core.control.PlayerSnapshot;
 import com.blastarena.core.control.WorldView;
 import com.blastarena.core.model.Position;
+import com.blastarena.core.powerup.PowerUpType;
+import java.util.Optional;
 
 /**
  * Draws the world as text, using the same symbols as the ASCII test boards:
- * {@code #} wall, {@code x} crate, {@code .} floor, {@code B} bomb, {@code *} fire, and a digit per living player.
- * When things share a tile, players show over fire, fire over bombs, and bombs over the floor.
+ * {@code #} wall, {@code x} crate, {@code .} floor, {@code B} bomb, {@code *} fire, a digit per living player,
+ * and {@code b}, {@code r}, {@code s} for extra-bomb, range and speed power-ups.
+ * When things share a tile, players show over fire, fire over bombs, and bombs over power-ups.
  */
 public final class TextRenderer {
 
@@ -37,10 +40,22 @@ public final class TextRenderer {
         if (view.bombAt(position).isPresent()) {
             return 'B';
         }
+        Optional<PowerUpType> powerUp = view.powerUpAt(position);
+        if (powerUp.isPresent()) {
+            return symbolFor(powerUp.get());
+        }
         return switch (view.tileAt(position)) {
             case SolidWall wall -> '#';
             case Crate crate -> 'x';
             case Floor floor -> '.';
+        };
+    }
+
+    public static char symbolFor(PowerUpType type) {
+        return switch (type) {
+            case EXTRA_BOMB -> 'b';
+            case BLAST_RANGE -> 'r';
+            case SPEED -> 's';
         };
     }
 }

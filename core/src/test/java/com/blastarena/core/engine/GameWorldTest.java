@@ -10,9 +10,11 @@ import com.blastarena.core.board.MapGenerator;
 import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.entity.Fire;
 import com.blastarena.core.entity.Player;
+import com.blastarena.core.entity.PowerUpDrop;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
+import com.blastarena.core.powerup.SpeedPowerUp;
 import com.blastarena.core.testing.AsciiWorld;
 import java.util.Random;
 import java.util.Set;
@@ -115,5 +117,30 @@ class GameWorldTest {
 
         assertThat(player.position()).isEqualTo(new Position(1, 0));
         assertThat(player.moveCooldown()).isEqualTo(3);
+    }
+
+    @Test
+    void powerUpsLieOnlyOnFreeWalkableTiles() {
+        GameWorld world = AsciiWorld.parse("1.x");
+
+        world.addDrop(new PowerUpDrop(new Position(1, 0), new SpeedPowerUp()));
+
+        assertThat(world.dropAt(new Position(1, 0))).isPresent();
+        assertThatIllegalStateException()
+                .isThrownBy(() -> world.addDrop(new PowerUpDrop(new Position(1, 0), new SpeedPowerUp())));
+        assertThatIllegalStateException()
+                .isThrownBy(() -> world.addDrop(new PowerUpDrop(new Position(2, 0), new SpeedPowerUp())));
+    }
+
+    @Test
+    void collectingAppliesThePowerUpAndTakesItOffTheFloor() {
+        GameWorld world = AsciiWorld.parse("1r.");
+        Player player = world.player(ONE);
+        PowerUpDrop drop = world.dropAt(new Position(1, 0)).orElseThrow();
+
+        world.collect(player, drop);
+
+        assertThat(player.stats().blastRange()).isEqualTo(2);
+        assertThat(world.drops()).isEmpty();
     }
 }

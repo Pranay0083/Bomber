@@ -5,5 +5,6 @@ package com.blastarena.core.event;
  * and publishes them at the end, so listeners never see a half-finished tick.
  */
 public sealed interface GameEvent
-        permits PlayerMoved, BombPlaced, BombExploded, CrateDestroyed, PlayerDied, RoundEnded {
+        permits PlayerMoved, BombPlaced, BombExploded, CrateDestroyed, PowerUpDropped, PowerUpCollected,
+                PowerUpBurned, PlayerDied, RoundEnded {
 }

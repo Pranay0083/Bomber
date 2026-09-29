@@ -7,19 +7,25 @@ import com.blastarena.core.control.Controller;
 import com.blastarena.core.control.WorldView;
 import com.blastarena.core.entity.Fire;
 import com.blastarena.core.entity.Player;
+import com.blastarena.core.entity.PowerUpDrop;
 import com.blastarena.core.event.BombExploded;
 import com.blastarena.core.event.CrateDestroyed;
 import com.blastarena.core.event.EventPublisher;
 import com.blastarena.core.event.GameEvent;
 import com.blastarena.core.event.PlayerDied;
+import com.blastarena.core.event.PowerUpBurned;
+import com.blastarena.core.event.PowerUpCollected;
+import com.blastarena.core.event.PowerUpDropped;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
 import com.blastarena.core.rules.Explosion;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,10 +37,10 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li>Count down move cooldowns, then ask every living player's controller for one command.</li>
  *   <li>Run the commands in player-id order: all moves first, then all bomb placements.</li>
- *   <li>Pick up power-ups (Phase 5).</li>
+ *   <li>Pick up any power-up on a tile a player now stands on.</li>
  *   <li>Count down every bomb's fuse.</li>
  *   <li>Explode due bombs and bombs sitting in fire, then everything they trigger.</li>
- *   <li>Destroy the crates those blasts hit.</li>
+ *   <li>Burn power-ups the blasts reached, then destroy the crates they hit and roll a drop for each.</li>
  *   <li>Count down the fire that existed before this tick and remove what burned out.</li>
  *   <li>Kill players standing in fire.</li>
  *   <li>Let the current phase move on (round timer, win check).</li>
@@ -54,7 +60,7 @@ public final class GameEngine {
     private long tickCount;
 
     public GameEngine(GameWorld world, Map<PlayerId, Controller> controllers, EventPublisher publisher) {
-        this(world, controllers, publisher, Rules.standard());
+        this(world, controllers, publisher, Rules.standard(world.config()));
     }
 
     public GameEngine(GameWorld world, Map<PlayerId, Controller> controllers, EventPublisher publisher, Rules rules) {
@@ -97,6 +103,7 @@ public final class GameEngine {
 
         if (phase.isRunning()) {
             runCommands(collectCommands(), events);
+            collectPowerUps(events);
             List<Fire> existingFire = List.copyOf(world.fires());
             world.tickBombs();
             explodeBombs(events);
@@ -135,6 +142,15 @@ public final class GameEngine {
                 .forEach(command -> command.execute(context));
     }
 
+    private void collectPowerUps(List<GameEvent> events) {
+        for (Player player : world.livingPlayers()) {
+            world.dropAt(player.position()).ifPresent(drop -> {
+                world.collect(player, drop);
+                events.add(new PowerUpCollected(player.id(), drop.powerUp().type(), drop.position()));
+            });
+        }
+    }
+
     private void explodeBombs(List<GameEvent> events) {
         var resolver = rules.explosionResolver();
         List<Explosion> chain = resolver.resolveChain(world, resolver.bombsToExplode(world));
@@ -142,6 +158,7 @@ public final class GameEngine {
             world.explode(explosion.bomb(), new Fire(explosion.fireTiles(), world.config().fireTicks()));
             events.add(new BombExploded(explosion.bomb().owner(), explosion.bomb().position(), explosion.fireTiles()));
         }
+        burnPowerUps(chain, events);
         List<Position> crates = chain.stream()
                 .flatMap(explosion -> explosion.cratesHit().stream())
                 .distinct()
@@ -149,6 +166,23 @@ public final class GameEngine {
         for (Position crate : crates) {
             world.destroyTile(crate);
             events.add(new CrateDestroyed(crate));
+            rules.powerUpFactory().rollDrop().ifPresent(powerUp -> {
+                world.addDrop(new PowerUpDrop(crate, powerUp));
+                events.add(new PowerUpDropped(crate, powerUp.type()));
+            });
+        }
+    }
+
+    /** Only power-ups already on the floor burn; one revealed by this tick's blast survives it. */
+    private void burnPowerUps(List<Explosion> chain, List<GameEvent> events) {
+        Set<Position> blasted = new HashSet<>();
+        chain.forEach(explosion -> blasted.addAll(explosion.fireTiles()));
+        List<PowerUpDrop> burned = world.drops().stream()
+                .filter(drop -> blasted.contains(drop.position()))
+                .toList();
+        for (PowerUpDrop drop : burned) {
+            world.removeDrop(drop);
+            events.add(new PowerUpBurned(drop.position(), drop.powerUp().type()));
         }
     }
 

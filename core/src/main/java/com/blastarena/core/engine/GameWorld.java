@@ -6,6 +6,7 @@ import com.blastarena.core.board.Tile;
 import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.entity.Fire;
 import com.blastarena.core.entity.Player;
+import com.blastarena.core.entity.PowerUpDrop;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
@@ -18,7 +19,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Everything that changes during a round: the board, players, bombs and fire.
+ * Everything that changes during a round: the board, players, bombs, fire and power-ups on the floor.
  * This is the only mutable game state. Rule classes read it and ask it to change;
  * it keeps the pieces consistent with each other (for example, a bomb's owner is told when it explodes).
  */
@@ -29,6 +30,7 @@ public final class GameWorld {
     private final List<Player> players;
     private final List<Bomb> bombs = new ArrayList<>();
     private final List<Fire> fires = new ArrayList<>();
+    private final List<PowerUpDrop> drops = new ArrayList<>();
 
     public GameWorld(GameConfig config, Board board, List<Player> players) {
         this.config = Objects.requireNonNull(config, "config");
@@ -91,6 +93,38 @@ public final class GameWorld {
 
     public boolean isBurning(Position position) {
         return fires.stream().anyMatch(fire -> fire.covers(position));
+    }
+
+    /** Power-ups on the floor, in the order they appeared. */
+    public List<PowerUpDrop> drops() {
+        return Collections.unmodifiableList(drops);
+    }
+
+    public Optional<PowerUpDrop> dropAt(Position position) {
+        return drops.stream().filter(drop -> drop.position().equals(position)).findFirst();
+    }
+
+    /** Puts a power-up on a walkable tile that has none yet. */
+    public void addDrop(PowerUpDrop drop) {
+        if (!board.tileAt(drop.position()).isWalkable()) {
+            throw new IllegalStateException("A power-up needs a walkable tile, not " + board.tileAt(drop.position()));
+        }
+        if (dropAt(drop.position()).isPresent()) {
+            throw new IllegalStateException("There is already a power-up at " + drop.position());
+        }
+        drops.add(drop);
+    }
+
+    public void removeDrop(PowerUpDrop drop) {
+        if (!drops.remove(drop)) {
+            throw new IllegalStateException(drop + " is not on the board");
+        }
+    }
+
+    /** Hands the power-up to the player and takes it off the floor. */
+    public void collect(Player player, PowerUpDrop drop) {
+        removeDrop(drop);
+        drop.powerUp().apply(player);
     }
 
     /** Moves a player and releases any bomb they were allowed to stand on. */
