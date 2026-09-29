@@ -200,7 +200,9 @@ public final class EditorScreen extends ScreenAdapter {
             message = "Fix the problems listed before playing";
             return;
         }
-        navigator.play(new CustomLevelSource(level.snapshot()), () -> navigator.resume(this));
+        // A test play is a single round with the bots chosen in the menu.
+        navigator.play(new CustomLevelSource(level.snapshot()), navigator.settings().withBestOf(1),
+                () -> navigator.resume(this));
     }
 
     private void startRenaming() {

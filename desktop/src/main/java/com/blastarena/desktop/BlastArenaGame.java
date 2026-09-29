@@ -3,14 +3,17 @@ package com.blastarena.desktop;
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
+import com.blastarena.core.engine.Match;
 import com.blastarena.core.level.EditableLevel;
 import com.blastarena.core.level.LevelRepository;
 import com.blastarena.core.level.MapSource;
 import com.blastarena.desktop.render.Screenshots;
 import com.blastarena.desktop.screen.EditorScreen;
 import com.blastarena.desktop.screen.GameScreen;
+import com.blastarena.desktop.screen.MatchSettings;
 import com.blastarena.desktop.screen.MenuScreen;
 import com.blastarena.desktop.screen.Navigator;
+import com.blastarena.desktop.screen.ResultScreen;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,15 +30,21 @@ public class BlastArenaGame extends Game implements Navigator {
     private float elapsedSeconds;
     /** Screens kept alive while another is shown, such as the editor during a test play. */
     private Screen parked;
+    private MatchSettings settings;
+    private final boolean autoplay;
+    private final float speed;
 
     /**
      * @param firstScreen    opens the first screen, normally the menu
      * @param screenshotPath if not null, save a screenshot there after {@code screenshotAfterSeconds} and quit.
      *                       Lets you check the drawing without a person at the keyboard.
      */
-    public BlastArenaGame(LevelRepository repository, Consumer<Navigator> firstScreen,
-                          String screenshotPath, float screenshotAfterSeconds) {
+    public BlastArenaGame(LevelRepository repository, MatchSettings settings, boolean autoplay, float speed,
+                          Consumer<Navigator> firstScreen, String screenshotPath, float screenshotAfterSeconds) {
+        this.speed = speed;
         this.repository = repository;
+        this.settings = settings;
+        this.autoplay = autoplay;
         this.firstScreen = firstScreen;
         this.screenshotPath = screenshotPath;
         this.screenshotAfterSeconds = screenshotAfterSeconds;
@@ -53,9 +62,27 @@ public class BlastArenaGame extends Game implements Navigator {
     }
 
     @Override
-    public void play(MapSource mapSource, Runnable onExit) {
+    public MatchSettings settings() {
+        return settings;
+    }
+
+    @Override
+    public void changeSettings(MatchSettings newSettings) {
+        this.settings = newSettings;
+    }
+
+    @Override
+    public void play(MapSource mapSource, MatchSettings matchSettings, Runnable onExit) {
         boolean fromEditor = getScreen() instanceof EditorScreen;
-        switchTo(new GameScreen(mapSource, onExit), fromEditor);
+        switchTo(new GameScreen(this, mapSource, matchSettings, onExit, autoplay, speed), fromEditor);
+    }
+
+    @Override
+    public void showResults(Match match, MapSource mapSource, MatchSettings matchSettings, Runnable onExit) {
+        switchTo(new ResultScreen(this, match, mapSource, matchSettings, onExit), false);
+        if (autoplay) {
+            LOG.info("Match over: {} won, scores {}", match.winner().orElseThrow(), match.scores());
+        }
     }
 
     @Override
