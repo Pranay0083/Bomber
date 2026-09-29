@@ -12,20 +12,19 @@ public class BlastArenaGame extends Game {
 
     private static final Logger LOG = LoggerFactory.getLogger(BlastArenaGame.class);
 
-    /** Frames to wait before taking the screenshot: about four seconds, past the countdown. */
-    private static final int SCREENSHOT_FRAME = 240;
-
     private final Layout layout;
     private final String screenshotPath;
-    private int frames;
+    private final float screenshotAfterSeconds;
+    private float elapsedSeconds;
 
     /**
-     * @param screenshotPath if not null, save a screenshot there after a few seconds and quit.
+     * @param screenshotPath if not null, save a screenshot there after {@code screenshotAfterSeconds} and quit.
      *                       Lets you check the drawing without a person at the keyboard.
      */
-    public BlastArenaGame(Layout layout, String screenshotPath) {
+    public BlastArenaGame(Layout layout, String screenshotPath, float screenshotAfterSeconds) {
         this.layout = layout;
         this.screenshotPath = screenshotPath;
+        this.screenshotAfterSeconds = screenshotAfterSeconds;
     }
 
     @Override
@@ -37,7 +36,11 @@ public class BlastArenaGame extends Game {
     @Override
     public void render() {
         super.render();
-        if (screenshotPath != null && ++frames == SCREENSHOT_FRAME) {
+        if (screenshotPath == null) {
+            return;
+        }
+        elapsedSeconds += Gdx.graphics.getDeltaTime();
+        if (elapsedSeconds >= screenshotAfterSeconds) {
             Screenshots.save(screenshotPath);
             LOG.info("Saved screenshot to {}", screenshotPath);
             Gdx.app.exit();

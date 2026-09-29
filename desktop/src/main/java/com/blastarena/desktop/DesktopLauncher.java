@@ -10,11 +10,15 @@ public final class DesktopLauncher {
     private DesktopLauncher() {
     }
 
-    /** Usage: {@code --screenshot=/path/to/file.png} saves one frame and quits. */
-    private static String screenshotPath(String[] args) {
+    /** Default delay for {@code --screenshot}: just past the three-second countdown. */
+    private static final float DEFAULT_SCREENSHOT_SECONDS = 4f;
+
+    /** Usage: {@code --screenshot=/path/to/file.png [--screenshot-after=seconds]} saves one frame and quits. */
+    private static String option(String[] args, String name) {
+        String prefix = "--" + name + "=";
         for (String arg : args) {
-            if (arg.startsWith("--screenshot=")) {
-                return arg.substring("--screenshot=".length());
+            if (arg.startsWith(prefix)) {
+                return arg.substring(prefix.length());
             }
         }
         return null;
@@ -29,6 +33,8 @@ public final class DesktopLauncher {
         config.setWindowedMode((int) layout.boardWidth(), (int) layout.totalHeight());
         config.useVsync(true);
         config.setForegroundFPS(60);
-        new Lwjgl3Application(new BlastArenaGame(layout, screenshotPath(args)), config);
+        String after = option(args, "screenshot-after");
+        float screenshotAfter = after == null ? DEFAULT_SCREENSHOT_SECONDS : Float.parseFloat(after);
+        new Lwjgl3Application(new BlastArenaGame(layout, option(args, "screenshot"), screenshotAfter), config);
     }
 }
