@@ -10,6 +10,8 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.blastarena.core.bot.BotController;
+import com.blastarena.desktop.audio.SoundEffects;
+import com.blastarena.desktop.audio.SoundListener;
 import com.blastarena.core.bot.Difficulty;
 import com.blastarena.core.control.Controller;
 import com.blastarena.core.engine.GameEngine;
@@ -39,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * Plays a best-of-N match on a map: player 1 on the keyboard against bots, one round after another.
  * Runs the engine on a fixed 50 ms tick and draws every frame.
  *
- * <p>P or Esc pauses; while paused R restarts the round and Q leaves. After a round, Enter starts the next one,
+ * <p>P or Esc pauses; while paused R restarts the round and Q leaves. M mutes the sound. After a round, Enter starts the next one,
  * and once the match is decided Enter shows the results.
  */
 public final class GameScreen extends ScreenAdapter {
@@ -54,6 +56,7 @@ public final class GameScreen extends ScreenAdapter {
     private final MapSource mapSource;
     private final MatchSettings settings;
     private final Runnable onExit;
+    private final SoundEffects sounds;
     private final boolean autoplay;
     private final float speed;
     private final FixedStepClock clock = new FixedStepClock(1f / GameConfig.TICKS_PER_SECOND);
@@ -82,7 +85,8 @@ public final class GameScreen extends ScreenAdapter {
      * @param speed    how many times faster than real time the game runs; 1 for normal play
      */
     public GameScreen(Navigator navigator, MapSource mapSource, MatchSettings settings, Runnable onExit,
-                      boolean autoplay, float speed) {
+                      SoundEffects sounds, boolean autoplay, float speed) {
+        this.sounds = sounds;
         this.navigator = navigator;
         this.mapSource = mapSource;
         this.settings = settings;
@@ -118,6 +122,8 @@ public final class GameScreen extends ScreenAdapter {
         engine = new GameEngine(world, controllers, publisher);
         animation = new AnimationListener(engine.view());
         publisher.subscribe(animation);
+        GameEngine current = engine;
+        publisher.subscribe(new SoundListener(sounds, current::tickCount));
         clock.reset();
         roundRecorded = false;
         paused = false;
@@ -144,6 +150,10 @@ public final class GameScreen extends ScreenAdapter {
                 return true;
             }
             return false;
+        }
+        if (keycode == Keys.M) {
+            sounds.toggleMute();
+            return true;
         }
         if (keycode == Keys.P || keycode == Keys.ESCAPE) {
             paused = !paused;
@@ -205,7 +215,8 @@ public final class GameScreen extends ScreenAdapter {
         viewport.apply();
         boardRenderer.draw(engine.view(), animation.placement(paused ? 0f : clock.alpha()), camera.combined);
         hudRenderer.draw(engine.view(),
-                new MatchHud(match.currentRound(), match.bestOf(), match.scores(), paused, match.winner()),
+                new MatchHud(match.currentRound(), match.bestOf(), match.scores(), paused, match.winner(),
+                        sounds.isMuted()),
                 camera.combined);
     }
 

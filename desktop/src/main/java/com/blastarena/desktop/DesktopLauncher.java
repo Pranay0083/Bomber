@@ -23,6 +23,7 @@ import java.util.function.Consumer;
  * {@code --start=menu|editor|random}, {@code --play=<level name>}, {@code --edit=<level name>},
  * {@code --bots=1..3}, {@code --difficulty=easy|medium|hard}, {@code --best-of=1|3|5},
  * {@code --autoplay} to put a bot in your seat and run the match by itself, {@code --speed=<n>} to run faster,
+ * {@code --mute} to start with sound off (screenshot runs are always muted),
  * and {@code --screenshot=<file.png> [--screenshot-after=<seconds>]} to save one frame and quit.
  */
 public final class DesktopLauncher {
@@ -64,7 +65,8 @@ public final class DesktopLauncher {
         String speed = option(args, "speed");
         new Lwjgl3Application(new BlastArenaGame(repository, settings(args), autoplay,
                 speed == null ? 1f : Float.parseFloat(speed),
-                firstScreen(args, repository), screenshot, screenshotAfter), config);
+                firstScreen(args, repository), screenshot, screenshotAfter)
+                .muted(screenshot != null || List.of(args).contains("--mute")), config);
     }
 
     private static MatchSettings settings(String[] args) {
