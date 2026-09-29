@@ -19,11 +19,11 @@ import com.blastarena.core.event.SynchronousEventPublisher;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.desktop.input.KeyboardController;
+import com.blastarena.desktop.render.AnimationListener;
 import com.blastarena.desktop.render.BoardRenderer;
 import com.blastarena.desktop.render.HudRenderer;
 import com.blastarena.desktop.render.Layout;
 import com.blastarena.desktop.render.Palette;
-import com.blastarena.desktop.render.PlayerPlacement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -63,6 +63,7 @@ public final class GameScreen extends ScreenAdapter {
     };
     private GameEngine engine;
     private KeyboardController keyboard;
+    private AnimationListener animation;
 
     public GameScreen(Layout layout) {
         this.layout = layout;
@@ -88,7 +89,10 @@ public final class GameScreen extends ScreenAdapter {
             controllers.put(new PlayerId(id), new IdleController(new PlayerId(id)));
         }
         Gdx.input.setInputProcessor(new InputMultiplexer(screenKeys, keyboard));
-        engine = new GameEngine(world, controllers, new SynchronousEventPublisher());
+        SynchronousEventPublisher publisher = new SynchronousEventPublisher();
+        engine = new GameEngine(world, controllers, publisher);
+        animation = new AnimationListener(engine.view());
+        publisher.subscribe(animation);
         clock.reset();
         LOG.info("New round, seed {}", config.seed());
     }
@@ -101,7 +105,7 @@ public final class GameScreen extends ScreenAdapter {
         }
         ScreenUtils.clear(Palette.BACKGROUND);
         viewport.apply();
-        boardRenderer.draw(engine.view(), PlayerPlacement.onTiles(), camera.combined);
+        boardRenderer.draw(engine.view(), animation.placement(clock.alpha()), camera.combined);
         hudRenderer.draw(engine.view(), camera.combined);
     }
 
