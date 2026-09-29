@@ -2,6 +2,7 @@ package com.blastarena.core.engine;
 
 import com.blastarena.core.board.Board;
 import com.blastarena.core.board.Destructible;
+import com.blastarena.core.board.SolidWall;
 import com.blastarena.core.board.Tile;
 import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.entity.Fire;
@@ -165,6 +166,24 @@ public final class GameWorld {
             throw new IllegalStateException(tile + " at " + position + " cannot be destroyed");
         }
         board.setTile(position, destructible.destroy());
+    }
+
+    /**
+     * Sudden death: turns the tile into solid wall. A bomb there is gone and its owner gets it back, a power-up
+     * there is gone, and every living player standing there is crushed. Returns the players crushed.
+     */
+    public List<Player> dropWall(Position position) {
+        bombAt(position).ifPresent(bomb -> {
+            bombs.remove(bomb);
+            player(bomb.owner()).bombExploded();
+        });
+        dropAt(position).ifPresent(drops::remove);
+        board.setTile(position, new SolidWall());
+        List<Player> crushed = livingPlayers().stream()
+                .filter(player -> player.position().equals(position))
+                .toList();
+        crushed.forEach(Player::kill);
+        return crushed;
     }
 
     public void tickCooldowns() {

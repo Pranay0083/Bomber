@@ -26,6 +26,9 @@ public final class DangerMap {
 
     public static final int NEVER = Integer.MAX_VALUE;
 
+    /** Sudden-death walls further off than this are ignored, so bots still find somewhere safe to stand. */
+    public static final int WALL_HORIZON_TICKS = 100;
+
     private final int width;
     private final int height;
     private final int fireTicks;
@@ -33,6 +36,8 @@ public final class DangerMap {
     private final boolean[] burning;
     /** For fire burning now: the last tick (from now) at whose end it is still there; 0 if it goes out next tick. */
     private final int[] burningUntil;
+    /** Ticks until a sudden-death wall lands here, or {@link #NEVER}. From then on the tile is deadly for good. */
+    private final int[] wallIn;
 
     private DangerMap(int width, int height, int fireTicks) {
         this.width = width;
@@ -41,7 +46,9 @@ public final class DangerMap {
         this.fireIn = new int[width * height];
         this.burning = new boolean[width * height];
         this.burningUntil = new int[width * height];
+        this.wallIn = new int[width * height];
         Arrays.fill(fireIn, NEVER);
+        Arrays.fill(wallIn, NEVER);
     }
 
     public static DangerMap of(WorldView view) {
@@ -56,6 +63,7 @@ public final class DangerMap {
             map.burning[map.index(position)] = true;
             map.burningUntil[map.index(position)] = Math.max(0, view.fireTicksLeft(position) - 1);
         }
+        map.markWalls(view);
         List<BombSnapshot> bombs = new ArrayList<>(view.bombs());
         bombs.addAll(extraBombs);
         map.simulate(view, bombs);
@@ -116,6 +124,19 @@ public final class DangerMap {
         }
     }
 
+    private void markWalls(WorldView view) {
+        long first = view.ticksUntilNextWall();
+        int interval = view.config().suddenDeathIntervalTicks();
+        List<Position> walls = view.upcomingWalls();
+        for (int i = 0; i < walls.size(); i++) {
+            long time = first + (long) i * interval;
+            if (time > WALL_HORIZON_TICKS) {
+                break;
+            }
+            wallIn[index(walls.get(i))] = (int) time;
+        }
+    }
+
     private void markFire(Position position, int time) {
         int i = index(position);
         fireIn[i] = Math.min(fireIn[i], time);
@@ -138,9 +159,14 @@ public final class DangerMap {
         return fireIn[index(position)];
     }
 
-    /** Burning now or about to be. */
+    /** Ticks until a sudden-death wall lands here, or {@link #NEVER} if none is due soon. */
+    public int ticksUntilWall(Position position) {
+        return wallIn[index(position)];
+    }
+
+    /** Burning now, about to be, or about to be walled in. */
     public boolean isThreatened(Position position) {
-        return isBurning(position) || ticksUntilFire(position) != NEVER;
+        return isBurning(position) || ticksUntilFire(position) != NEVER || ticksUntilWall(position) != NEVER;
     }
 
     /** Whether a player on this tile at the end of the tick {@code tick} ticks from now would die. */
@@ -154,6 +180,9 @@ public final class DangerMap {
             return false;
         }
         if (first <= burningUntil[index(position)]) {
+            return true;
+        }
+        if (last >= wallIn[index(position)]) {
             return true;
         }
         int start = ticksUntilFire(position);

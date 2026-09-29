@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 class GamePhaseTest {
 
     private final GameWorld world = AsciiWorld.parse("1.2");
-    private final PhaseContext context = new PhaseContext(world, new WinConditionChecker());
+    private final PhaseContext context = new PhaseContext(world, new WinConditionChecker(), event -> { });
 
     @Test
     void startsWithACountdownUnlessItIsZero() {

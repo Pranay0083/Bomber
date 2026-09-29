@@ -56,4 +56,14 @@ public interface WorldView {
      * dies if still there at the end of any of the next {@code n - 1} ticks.
      */
     int fireTicksLeft(Position position);
+
+    /** Tiles sudden death will still wall in, in the order they fall. */
+    List<Position> upcomingWalls();
+
+    /**
+     * Ticks from now until the next sudden-death wall lands (at the end of that tick), counting the countdown and
+     * round timer before sudden death starts; {@link Integer#MAX_VALUE} once the round is over.
+     * Later walls follow every {@code config().suddenDeathIntervalTicks()} ticks.
+     */
+    int ticksUntilNextWall();
 }
