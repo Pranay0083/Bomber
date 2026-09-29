@@ -8,6 +8,7 @@ import com.blastarena.core.control.PlayerSnapshot;
 import com.blastarena.core.engine.GameEngine;
 import com.blastarena.core.engine.GameWorld;
 import com.blastarena.core.entity.Player;
+import com.blastarena.core.event.PlayerDied;
 import com.blastarena.core.event.SynchronousEventPublisher;
 import com.blastarena.core.board.Board;
 import com.blastarena.core.command.MoveCommand;
@@ -44,7 +45,7 @@ class AnimationListenerTest {
 
     private float drawnX(float alpha) {
         PlayerSnapshot one = engine.view().player(ONE).orElseThrow();
-        return animation.placement(alpha).tileCoordinates(one)[0];
+        return animation.pose(one, alpha).x();
     }
 
     @Test
@@ -78,6 +79,33 @@ class AnimationListenerTest {
         engine.tick();
 
         PlayerSnapshot two = engine.view().player(TWO).orElseThrow();
-        assertThat(animation.placement(0.5f).tileCoordinates(two)).containsExactly(8f, 1f);
+        BoardAnimation.Pose pose = animation.pose(two, 0.5f);
+        assertThat(pose.x()).isEqualTo(8f);
+        assertThat(pose.y()).isEqualTo(1f);
+        assertThat(pose.facing()).isEqualTo(Direction.DOWN);
+    }
+
+    @Test
+    void walkersFaceTheWayTheyMoveAndLiftAFootMidStep() {
+        engine.tick();
+        PlayerSnapshot one = engine.view().player(ONE).orElseThrow();
+
+        assertThat(animation.pose(one, 0f).facing()).isEqualTo(Direction.RIGHT);
+        assertThat(animation.pose(one, 0f).step()).isZero();
+        engine.tick();
+        engine.tick();
+        assertThat(animation.pose(one, 0.5f).step()).isEqualTo(1);
+    }
+
+    @Test
+    void aDeathLeavesAShortEffectThatThenGoesAway() {
+        animation.onEvent(new PlayerDied(TWO, new Position(8, 1)));
+
+        assertThat(animation.effects(0f)).extracting(BoardAnimation.Effect::kind)
+                .containsExactly(BoardAnimation.Effect.Kind.POOF);
+        for (int i = 0; i < AnimationListener.EFFECT_TICKS; i++) {
+            engine.tick();
+        }
+        assertThat(animation.effects(0f)).isEmpty();
     }
 }

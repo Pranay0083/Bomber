@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Draws Blast Arena's pixel-art sprites into desktop/src/main/resources/sprites.png.
 
-Every sprite is 16x16 and the sheet is 8 sprites wide. The order here must match
-com.blastarena.desktop.render.Sprite. Standard library only, and deterministic,
-so running it again gives the same file.
+Every sprite is 16x16 and the sheet is 8 sprites wide. sprites.txt lists each sprite's name and position;
+the game looks sprites up by name (com.blastarena.desktop.render.Sprite) and checks every one is there.
+Standard library only, and deterministic, so running it again gives the same files.
 """
 import math
 import random
@@ -99,34 +99,121 @@ def bomb(frame):
     return pixels
 
 
-def fire(frame):
-    """Four frames: a bright flash, a full blaze, dying down, embers."""
+FIRE_THICKNESS = (4.0, 6.2, 5.2, 3.2)
+FIRE_ALPHA = (255, 255, 235, 180)
+
+
+def fire_colours(frame):
+    alpha = FIRE_ALPHA[frame]
+    if frame <= 1:
+        return [rgba("ffffff", alpha), rgba("fde047", alpha), rgba("f97316", alpha), rgba("dc2626", alpha)]
+    return [rgba("fde047", alpha), rgba("f97316", alpha), rgba("dc2626", alpha), rgba("7f1d1d", alpha)]
+
+
+def fire_shape(frame, distance_of):
+    """Paints fire wherever distance_of(x, y) is within the frame's thickness, in bands from a hot core out."""
     rng = random.Random(100 + frame)
-    radius = (5.5, 8.5, 7.5, 5.0)[frame]
-    alpha = (255, 255, 220, 150)[frame]
-    colours = [rgba("ffffff", alpha), rgba("fde047", alpha), rgba("f97316", alpha), rgba("dc2626", alpha)]
-    if frame >= 2:
-        colours = colours[1:] + [rgba("7f1d1d", alpha)]
+    wobble = [rng.uniform(-0.9, 0.9) for _ in range(SIZE * SIZE)]
+    half = FIRE_THICKNESS[frame]
+    colours = fire_colours(frame)
     pixels = blank()
     for y in range(SIZE):
         for x in range(SIZE):
-            distance = math.hypot(x + 0.5 - 8, y + 0.5 - 8) + rng.uniform(-1.2, 1.2)
-            if distance <= radius:
-                band = min(len(colours) - 1, int(distance / radius * len(colours)))
+            distance = distance_of(x + 0.5, y + 0.5) + wobble[y * SIZE + x]
+            if distance <= half:
+                band = min(len(colours) - 1, int(max(0.0, distance) / half * len(colours)))
                 pixels[y][x] = colours[band]
     return pixels
 
 
-def player():
-    """Drawn in white and greys so the game can tint it to each player's colour."""
+def fire_centre(frame):
+    """Where the blast starts, or where its lines cross: arms out to all four edges round a hot core."""
+    return fire_shape(frame, lambda x, y: min(abs(y - 8), abs(x - 8), math.hypot(x - 8, y - 8) * 0.55))
+
+
+def fire_arm(frame):
+    """A stretch of blast running left to right; turned a quarter for up and down."""
+    return fire_shape(frame, lambda x, y: abs(y - 8))
+
+
+def fire_end(frame):
+    """The tip of a blast pointing right; turned for the other directions."""
+    def distance(x, y):
+        return abs(y - 8) if x <= 8 else math.hypot(x - 8, y - 8) * 1.15
+    return fire_shape(frame, distance)
+
+
+PLAYER_EYES = {
+    "down": ((6, 8), (10, 8)),
+    "left": ((4, 8), (7, 8)),
+    "right": ((9, 8), (12, 8)),
+    "up": (),
+}
+
+
+def player(facing="down", step=0):
+    """Drawn in white and greys so the game can tint it to each player's colour. step 1 lifts a foot."""
     pixels = blank()
-    disc(pixels, 8, 9, 6.2, rgba("9ca3af"))
-    disc(pixels, 8, 8.4, 5.6, rgba("ffffff"))
-    disc(pixels, 6.2, 6.4, 1.5, rgba("f3f4f6"))
-    for x, y in ((6, 8), (6, 9), (10, 8), (10, 9)):
-        pixels[y][x] = rgba("111827")
-    rect(pixels, 4, 14, 6, 15, rgba("4b5563"))
-    rect(pixels, 10, 14, 12, 15, rgba("4b5563"))
+    bob = 1 if step == 1 else 0
+    disc(pixels, 8, 9 - bob, 6.2, rgba("9ca3af"))
+    disc(pixels, 8, 8.4 - bob, 5.6, rgba("ffffff"))
+    if facing == "up":
+        disc(pixels, 8, 9.6 - bob, 3.4, rgba("e5e7eb"))
+    else:
+        disc(pixels, 6.2, 6.4 - bob, 1.5, rgba("f3f4f6"))
+    for x, y in PLAYER_EYES[facing]:
+        for dy in (0, 1):
+            pixels[y + dy - bob][x] = rgba("111827")
+    left_foot, right_foot = (14, 15) if step == 0 else (13, 15)
+    rect(pixels, 4, left_foot, 6, 15, rgba("4b5563"))
+    rect(pixels, 10, 14 if step == 0 else 13, 12, 15 if step == 0 else 14, rgba("4b5563"))
+    return pixels
+
+
+def shadow():
+    pixels = blank()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if ((x + 0.5 - 8) / 6.5) ** 2 + ((y + 0.5 - 14) / 2.2) ** 2 <= 1:
+                pixels[y][x] = (0, 0, 0, 80)
+    return pixels
+
+
+def floor_shadow():
+    """The shade a wall or crate casts on the floor just below it."""
+    pixels = blank()
+    for y, alpha in enumerate((95, 70, 45, 20)):
+        for x in range(SIZE):
+            pixels[y][x] = (0, 0, 0, alpha)
+    return pixels
+
+
+def poof(frame):
+    """A puff of smoke where a player was knocked out."""
+    rng = random.Random(300 + frame)
+    radius = (3.0, 5.0, 6.5)[frame]
+    alpha = (240, 190, 110)[frame]
+    pixels = blank()
+    for i in range(7):
+        angle = i / 7 * 2 * math.pi + rng.uniform(-0.3, 0.3)
+        cx, cy = 8 + math.cos(angle) * radius, 8 + math.sin(angle) * radius
+        disc(pixels, cx, cy, 2.4 - frame * 0.5, rgba("f3f4f6", alpha))
+    disc(pixels, 8, 8, max(0.0, 2.5 - frame * 1.2), rgba("ffffff", alpha))
+    return pixels
+
+
+def debris(frame):
+    """Splinters flying out of a broken crate."""
+    rng = random.Random(400)
+    spread = (2.0, 4.5, 6.5)[frame]
+    alpha = (255, 220, 140)[frame]
+    pixels = blank()
+    for _ in range(9):
+        angle = rng.uniform(0, 2 * math.pi)
+        distance = spread * rng.uniform(0.6, 1.0)
+        x, y = int(8 + math.cos(angle) * distance), int(8 + math.sin(angle) * distance + frame)
+        colour = rgba("a16207", alpha) if rng.random() < 0.6 else rgba("713f12", alpha)
+        rect(pixels, x, y, x + 1, y, colour)
     return pixels
 
 
@@ -222,12 +309,19 @@ def crate_zone():
 
 
 SPRITES = [
-    floor(1), floor(2), wall(), crate(),
-    bomb(0), bomb(1), fire(0), fire(1),
-    fire(2), fire(3), player(), power_up_bomb(),
-    power_up_range(), power_up_speed(), warning(), spawn_marker(),
-    crate_zone(),
+    ("FLOOR_A", floor(1)), ("FLOOR_B", floor(2)), ("WALL", wall()), ("CRATE", crate()),
+    ("BOMB_0", bomb(0)), ("BOMB_1", bomb(1)),
+    ("POWER_UP_BOMB", power_up_bomb()), ("POWER_UP_RANGE", power_up_range()), ("POWER_UP_SPEED", power_up_speed()),
+    ("WARNING", warning()), ("SPAWN_MARKER", spawn_marker()), ("CRATE_ZONE", crate_zone()),
+    ("SHADOW", shadow()), ("FLOOR_SHADOW", floor_shadow()),
 ]
+SPRITES += [(f"FIRE_CENTRE_{f}", fire_centre(f)) for f in range(4)]
+SPRITES += [(f"FIRE_ARM_{f}", fire_arm(f)) for f in range(4)]
+SPRITES += [(f"FIRE_END_{f}", fire_end(f)) for f in range(4)]
+SPRITES += [(f"PLAYER_{facing.upper()}_{step}", player(facing, step))
+            for facing in ("down", "up", "left", "right") for step in (0, 1)]
+SPRITES += [(f"POOF_{f}", poof(f)) for f in range(3)]
+SPRITES += [(f"DEBRIS_{f}", debris(f)) for f in range(3)]
 
 
 def write_png(path, width, height, pixels):
@@ -245,12 +339,15 @@ def write_png(path, width, height, pixels):
 def main():
     rows = (len(SPRITES) + COLUMNS - 1) // COLUMNS
     sheet = [[CLEAR for _ in range(COLUMNS * SIZE)] for _ in range(rows * SIZE)]
-    for index, sprite in enumerate(SPRITES):
+    index_lines = []
+    for index, (name, sprite) in enumerate(SPRITES):
         left, top = (index % COLUMNS) * SIZE, (index // COLUMNS) * SIZE
+        index_lines.append(f"{name} {left} {top} {SIZE} {SIZE}")
         for y in range(SIZE):
             for x in range(SIZE):
                 sheet[top + y][left + x] = sprite[y][x]
     write_png(OUT, COLUMNS * SIZE, rows * SIZE, sheet)
+    OUT.with_suffix(".txt").write_text("\n".join(index_lines) + "\n")
     print(f"Wrote {len(SPRITES)} sprites to {OUT}")
 
 

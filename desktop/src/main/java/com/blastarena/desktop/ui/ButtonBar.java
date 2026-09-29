@@ -1,7 +1,7 @@
 package com.blastarena.desktop.ui;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.blastarena.desktop.render.Palette;
@@ -15,7 +15,6 @@ import java.util.List;
 public final class ButtonBar {
 
     private final List<Button> buttons = new ArrayList<>();
-    private final GlyphLayout glyphs = new GlyphLayout();
 
     public void clear() {
         buttons.clear();
@@ -40,18 +39,22 @@ public final class ButtonBar {
 
     public void drawBoxes(ShapeRenderer shapes) {
         for (Button button : buttons) {
-            shapes.setColor(!button.enabled() ? Palette.BUTTON_DISABLED
-                    : button.selected() ? Palette.BUTTON_SELECTED : Palette.BUTTON);
-            shapes.rect(button.x(), button.y(), button.width(), button.height());
+            Color fill = !button.enabled() ? Palette.BUTTON_DISABLED
+                    : button.selected() ? Palette.BUTTON_SELECTED : Palette.BUTTON;
+            Color border = button.selected() ? Palette.BUTTON_SELECTED_EDGE : Palette.BUTTON_EDGE;
+            Ui.panel(shapes, button.x(), button.y(), button.width(), button.height(), fill, border);
         }
     }
 
+    /** Labels at the small text size, or {@code scale} if given. */
     public void drawLabels(SpriteBatch batch, BitmapFont font) {
+        drawLabels(batch, font, UiFont.SMALL);
+    }
+
+    public void drawLabels(SpriteBatch batch, BitmapFont font, float scale) {
         for (Button button : buttons) {
-            font.setColor(button.enabled() ? Palette.TEXT : Palette.TEXT_DIM);
-            glyphs.setText(font, button.label());
-            font.draw(batch, glyphs, button.x() + (button.width() - glyphs.width) / 2,
-                    button.y() + (button.height() + glyphs.height) / 2);
+            Ui.text(batch, font, button.label(), scale, button.enabled() ? Palette.TEXT : Palette.TEXT_DIM,
+                    button.x() + button.width() / 2, button.y() + button.height() / 2, Ui.Align.CENTRE);
         }
     }
 }

@@ -8,6 +8,9 @@ import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
+import com.badlogic.gdx.utils.Align;
+import com.blastarena.desktop.ui.UiFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
@@ -39,6 +42,7 @@ import com.blastarena.desktop.render.SpriteSheet;
 import com.blastarena.desktop.render.TileArt;
 import com.blastarena.desktop.ui.Button;
 import com.blastarena.desktop.ui.ButtonBar;
+import com.blastarena.desktop.ui.Ui;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -54,7 +58,7 @@ public final class EditorScreen extends ScreenAdapter {
 
     private static final float WIDTH = MenuScreen.WIDTH;
     private static final float HEIGHT = MenuScreen.HEIGHT;
-    private static final float PANEL_WIDTH = 248;
+    private static final float PANEL_WIDTH = 300;
     private static final float MARGIN = 16;
     private static final float BUTTON_HEIGHT = 26;
     private static final float GAP = 6;
@@ -68,10 +72,10 @@ public final class EditorScreen extends ScreenAdapter {
             new PaintChoice("2 Wall", Keys.NUM_2, new Paint.OfCell(Cell.WALL)),
             new PaintChoice("3 Crate", Keys.NUM_3, new Paint.OfCell(Cell.CRATE)),
             new PaintChoice("4 Spawn", Keys.NUM_4, new Paint.OfCell(Cell.SPAWN)),
-            new PaintChoice("5 Crate zone", Keys.NUM_5, new Paint.OfCell(Cell.CRATE_ZONE)),
-            new PaintChoice("6 Extra bomb", Keys.NUM_6, new Paint.OfPowerUp(PowerUpType.EXTRA_BOMB)),
-            new PaintChoice("7 Range", Keys.NUM_7, new Paint.OfPowerUp(PowerUpType.BLAST_RANGE)),
-            new PaintChoice("8 Speed", Keys.NUM_8, new Paint.OfPowerUp(PowerUpType.SPEED)));
+            new PaintChoice("5 Zone", Keys.NUM_5, new Paint.OfCell(Cell.CRATE_ZONE)),
+            new PaintChoice("6 Bomb+", Keys.NUM_6, new Paint.OfPowerUp(PowerUpType.EXTRA_BOMB)),
+            new PaintChoice("7 Range+", Keys.NUM_7, new Paint.OfPowerUp(PowerUpType.BLAST_RANGE)),
+            new PaintChoice("8 Speed+", Keys.NUM_8, new Paint.OfPowerUp(PowerUpType.SPEED)));
 
     private final Navigator navigator;
     private final LevelRepository repository;
@@ -82,9 +86,10 @@ public final class EditorScreen extends ScreenAdapter {
     private final Viewport viewport = new FitViewport(WIDTH, HEIGHT, camera);
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = UiFont.create();
     private final SpriteSheet sheet = new SpriteSheet();
     private final ButtonBar buttons = new ButtonBar();
+    private final GlyphLayout wrapped = new GlyphLayout();
 
     private List<LevelProblem> problems = List.of();
     private PaintChoice paint = PAINTS.get(1);
@@ -398,13 +403,25 @@ public final class EditorScreen extends ScreenAdapter {
 
     // ---- drawing ----------------------------------------------------------------------------------------------
 
+    /** Section headings and where they go, filled in while laying out the buttons. */
+    private final List<Object[]> headings = new ArrayList<>();
+    private float problemsTop;
+
+    private void heading(String text, float left, float y) {
+        headings.add(new Object[] {text, left, y});
+    }
+
     private void layOutButtons(float left, float top) {
         buttons.clear();
-        float half = (PANEL_WIDTH - MARGIN * 2 - GAP) / 2;
-        float third = (PANEL_WIDTH - MARGIN * 2 - GAP * 2) / 3;
+        headings.clear();
+        float inner = PANEL_WIDTH - MARGIN * 2;
+        float half = (inner - GAP) / 2;
+        float third = (inner - GAP * 2) / 3;
+        float quarter = (inner - GAP * 3) / 4;
         float y = top;
 
-        y -= BUTTON_HEIGHT;
+        heading("Tools", left, y);
+        y -= 18 + BUTTON_HEIGHT;
         buttons.add(Button.of("B Brush", left, y, third, BUTTON_HEIGHT, () -> baseTool = new BrushTool())
                 .selected(baseTool instanceof BrushTool));
         buttons.add(Button.of("R Rect", left + third + GAP, y, third, BUTTON_HEIGHT, () -> baseTool = new RectangleTool())
@@ -412,42 +429,50 @@ public final class EditorScreen extends ScreenAdapter {
         buttons.add(Button.of("F Fill", left + (third + GAP) * 2, y, third, BUTTON_HEIGHT, () -> baseTool = new FillTool())
                 .selected(baseTool instanceof FillTool));
         y -= BUTTON_HEIGHT + GAP;
-        buttons.add(Button.of("M Mirror " + (mirror ? "on" : "off"), left, y, half * 2 + GAP, BUTTON_HEIGHT,
+        buttons.add(Button.of("M Mirror " + (mirror ? "on" : "off"), left, y, inner, BUTTON_HEIGHT,
                 () -> mirror = !mirror).selected(mirror));
 
-        y -= GAP * 2;
+        y -= 14;
+        heading("Paint", left, y);
+        y -= 18;
         for (int i = 0; i < PAINTS.size(); i++) {
             PaintChoice choice = PAINTS.get(i);
             if (i % 2 == 0) {
-                y -= BUTTON_HEIGHT + GAP;
+                y -= BUTTON_HEIGHT + (i == 0 ? 0 : GAP);
             }
             float x = left + (i % 2) * (half + GAP);
             buttons.add(Button.of(choice.label(), x, y, half, BUTTON_HEIGHT, () -> paint = choice)
                     .selected(choice == paint));
         }
 
-        y -= GAP * 2 + BUTTON_HEIGHT + GAP;
-        buttons.add(Button.of("[ W-", left, y, third, BUTTON_HEIGHT, () -> resizeLevel(-2, 0)));
-        buttons.add(Button.of("W+ ]", left + third + GAP, y, third, BUTTON_HEIGHT, () -> resizeLevel(2, 0)));
-        buttons.add(Button.of("- Crates", left + (third + GAP) * 2, y, third, BUTTON_HEIGHT, () -> density(-0.1)));
-        y -= BUTTON_HEIGHT + GAP;
-        buttons.add(Button.of(", H-", left, y, third, BUTTON_HEIGHT, () -> resizeLevel(0, -2)));
-        buttons.add(Button.of("H+ .", left + third + GAP, y, third, BUTTON_HEIGHT, () -> resizeLevel(0, 2)));
-        buttons.add(Button.of("= Crates", left + (third + GAP) * 2, y, third, BUTTON_HEIGHT, () -> density(0.1)));
+        y -= 14;
+        heading("Size " + level.width() + " x " + level.height(), left, y);
+        y -= 18 + BUTTON_HEIGHT;
+        buttons.add(Button.of("[ W-", left, y, quarter, BUTTON_HEIGHT, () -> resizeLevel(-2, 0)));
+        buttons.add(Button.of("W+ ]", left + (quarter + GAP), y, quarter, BUTTON_HEIGHT, () -> resizeLevel(2, 0)));
+        buttons.add(Button.of(", H-", left + (quarter + GAP) * 2, y, quarter, BUTTON_HEIGHT, () -> resizeLevel(0, -2)));
+        buttons.add(Button.of("H+ .", left + (quarter + GAP) * 3, y, quarter, BUTTON_HEIGHT, () -> resizeLevel(0, 2)));
 
-        y -= GAP * 2 + BUTTON_HEIGHT;
+        y -= 14;
+        heading("Crate zones " + Math.round(level.crateDensity() * 100) + "%", left, y);
+        y -= 18 + BUTTON_HEIGHT;
+        buttons.add(Button.of("- Fewer", left, y, half, BUTTON_HEIGHT, () -> density(-0.1)));
+        buttons.add(Button.of("= More", left + half + GAP, y, half, BUTTON_HEIGHT, () -> density(0.1)));
+
+        y -= 14;
+        heading("Level", left, y);
+        y -= 18 + BUTTON_HEIGHT;
         buttons.add(Button.of("Undo", left, y, half, BUTTON_HEIGHT, this::undo).enabled(history.canUndo()));
         buttons.add(Button.of("Redo", left + half + GAP, y, half, BUTTON_HEIGHT, this::redo).enabled(history.canRedo()));
         y -= BUTTON_HEIGHT + GAP;
         buttons.add(Button.of("N Rename", left, y, half, BUTTON_HEIGHT, this::startRenaming));
         buttons.add(Button.of("Save", left + half + GAP, y, half, BUTTON_HEIGHT, this::save));
         y -= BUTTON_HEIGHT + GAP;
-        buttons.add(Button.of("T Test play", left, y, half, BUTTON_HEIGHT, this::testPlay).enabled(problems.isEmpty()));
+        buttons.add(Button.of("T Play", left, y, half, BUTTON_HEIGHT, this::testPlay)
+                .enabled(problems.isEmpty()).selected(problems.isEmpty()));
         buttons.add(Button.of("Esc Menu", left + half + GAP, y, half, BUTTON_HEIGHT, this::back));
-        problemsTop = y - GAP * 3;
+        problemsTop = y - 22;
     }
-
-    private float problemsTop;
 
     @Override
     public void render(float delta) {
@@ -456,7 +481,7 @@ public final class EditorScreen extends ScreenAdapter {
         shapes.setProjectionMatrix(camera.combined);
         batch.setProjectionMatrix(camera.combined);
         float panelLeft = WIDTH - PANEL_WIDTH;
-        layOutButtons(panelLeft + MARGIN, HEIGHT - 100);
+        layOutButtons(panelLeft + MARGIN, HEIGHT - 84);
 
         batch.begin();
         drawCells();
@@ -533,31 +558,36 @@ public final class EditorScreen extends ScreenAdapter {
     }
 
     private void drawPanelText(float left) {
-        font.getData().setScale(1.5f);
-        font.setColor(Palette.TEXT);
+        float inner = PANEL_WIDTH - MARGIN * 2;
         String name = renaming != null ? renaming + "_" : level.name() + (hasUnsavedChanges() ? " *" : "");
-        font.draw(batch, name, left, HEIGHT - 22);
-        font.getData().setScale(1.05f);
-        font.setColor(Palette.TEXT_DIM);
-        font.draw(batch, level.width() + " x " + level.height() + "   crate zones "
-                + Math.round(level.crateDensity() * 100) + "%", left, HEIGHT - 50);
-        font.draw(batch, "Left paints, right erases", left, HEIGHT - 72);
+        Ui.text(batch, font, name, UiFont.NORMAL, renaming != null ? Palette.ACCENT : Palette.TEXT,
+                left, HEIGHT - 30, Ui.Align.LEFT);
+        Ui.text(batch, font, "Right-click erases", UiFont.SMALL, Palette.TEXT_DIM, left, HEIGHT - 58, Ui.Align.LEFT);
+        for (Object[] heading : headings) {
+            Ui.text(batch, font, (String) heading[0], UiFont.SMALL, Palette.ACCENT, (float) heading[1],
+                    (float) heading[2] - 8, Ui.Align.LEFT);
+        }
 
         float y = problemsTop;
         if (problems.isEmpty()) {
-            font.setColor(Palette.GOOD);
-            font.draw(batch, "Ready to play", left, y);
+            Ui.text(batch, font, "Ready to play", UiFont.SMALL, Palette.GOOD, left, y, Ui.Align.LEFT);
         } else {
+            Ui.text(batch, font, problems.size() + (problems.size() == 1 ? " problem" : " problems"), UiFont.SMALL,
+                    Palette.PROBLEM, left, y, Ui.Align.LEFT);
+            y -= 12;
+            font.getData().setScale(UiFont.SMALL);
             font.setColor(Palette.PROBLEM);
-            font.draw(batch, problems.size() + (problems.size() == 1 ? " problem:" : " problems:"), left, y);
-            for (LevelProblem problem : problems.stream().limit(5).toList()) {
-                y -= 20;
-                font.draw(batch, problem.message(), left, y, PANEL_WIDTH - MARGIN * 2, -1, true);
-                y -= font.getLineHeight() * (problem.message().length() > 34 ? 1 : 0);
+            for (LevelProblem problem : problems.stream().limit(3).toList()) {
+                wrapped.setText(font, problem.message(), Palette.PROBLEM, inner, Align.left, true);
+                font.draw(batch, wrapped, left, y);
+                y -= wrapped.height + 10;
             }
         }
-        font.setColor(Palette.TEXT);
-        font.draw(batch, message, left, 40, PANEL_WIDTH - MARGIN * 2, -1, true);
+        if (!message.isEmpty()) {
+            font.getData().setScale(UiFont.SMALL);
+            wrapped.setText(font, message, Palette.TEXT, inner, Align.left, true);
+            font.draw(batch, wrapped, left, 16 + wrapped.height);
+        }
     }
 
     @Override
