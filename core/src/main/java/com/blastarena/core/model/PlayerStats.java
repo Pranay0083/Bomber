@@ -12,6 +12,9 @@ public record PlayerStats(int bombCapacity, int blastRange, int speedLevel) {
 
     public static final PlayerStats DEFAULT = new PlayerStats(1, 1, 0);
 
+    /** Ticks between tile moves at speed level 0: four tiles per second. */
+    public static final int BASE_MOVE_DELAY_TICKS = 5;
+
     public PlayerStats {
         if (bombCapacity < 1) {
             throw new IllegalArgumentException("Bomb capacity must be at least 1, was " + bombCapacity);
@@ -22,6 +25,11 @@ public record PlayerStats(int bombCapacity, int blastRange, int speedLevel) {
         if (speedLevel < 0) {
             throw new IllegalArgumentException("Speed level must not be negative, was " + speedLevel);
         }
+    }
+
+    /** Ticks a player waits after a move; each speed level takes one tick off, never going below one. */
+    public int moveDelayTicks() {
+        return Math.max(1, BASE_MOVE_DELAY_TICKS - speedLevel);
     }
 
     public PlayerStats withBombCapacity(int newBombCapacity) {
