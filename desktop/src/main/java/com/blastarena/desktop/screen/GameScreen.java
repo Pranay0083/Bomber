@@ -9,7 +9,6 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.blastarena.core.board.Board;
 import com.blastarena.core.board.MapGenerator;
 import com.blastarena.core.bot.BotController;
 import com.blastarena.core.bot.Difficulty;
@@ -17,6 +16,8 @@ import com.blastarena.core.control.Controller;
 import com.blastarena.core.engine.GameEngine;
 import com.blastarena.core.engine.GameWorld;
 import com.blastarena.core.event.SynchronousEventPublisher;
+import com.blastarena.core.level.MapSource;
+import com.blastarena.core.level.RandomMapSource;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.desktop.input.KeyboardController;
@@ -27,7 +28,6 @@ import com.blastarena.desktop.render.Layout;
 import com.blastarena.desktop.render.Palette;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +62,7 @@ public final class GameScreen extends ScreenAdapter {
             return false;
         }
     };
+    private final MapSource mapSource = new RandomMapSource(new MapGenerator());
     private GameEngine engine;
     private KeyboardController keyboard;
     private AnimationListener animation;
@@ -80,8 +81,7 @@ public final class GameScreen extends ScreenAdapter {
                 .height(layout.rows())
                 .seed(System.nanoTime())
                 .build();
-        Board board = new MapGenerator().generate(config, new Random(config.seed()));
-        GameWorld world = GameWorld.withPlayersOnSpawns(config, board, PLAYER_COUNT);
+        GameWorld world = GameWorld.forArena(config, mapSource.createArena(config), PLAYER_COUNT);
 
         keyboard = new KeyboardController(HUMAN);
         Map<PlayerId, Controller> controllers = new HashMap<>();
