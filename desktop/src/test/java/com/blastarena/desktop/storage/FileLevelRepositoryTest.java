@@ -74,6 +74,19 @@ class FileLevelRepositoryTest {
     }
 
     @Test
+    void findsALevelWhoseFileWasNamedSomethingElse() throws IOException, LevelFormatException {
+        FileLevelRepository repository = repository();
+        LevelData level = level("Walled Off");
+        Files.createDirectories(repository.directory());
+        Files.writeString(repository.directory().resolve("copied-in.json"), new LevelCodec().encode(level));
+
+        assertThat(repository.list()).containsExactly("Walled Off");
+        assertThat(repository.load("Walled Off")).contains(level);
+        assertThat(repository.delete("Walled Off")).isTrue();
+        assertThat(repository.list()).isEmpty();
+    }
+
+    @Test
     void anEmptyOrMissingDirectoryHasNoLevels() throws IOException, LevelFormatException {
         assertThat(repository().list()).isEmpty();
         assertThat(repository().load("Nothing")).isEmpty();

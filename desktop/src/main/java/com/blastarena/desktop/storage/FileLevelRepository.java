@@ -17,7 +17,10 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Keeps each level as a JSON file named after it, by default in {@code ~/.blastarena/levels/}. */
+/**
+ * Keeps each level as a JSON file named after it, by default in {@code ~/.blastarena/levels/}.
+ * Set the {@code BLASTARENA_LEVELS} environment variable to use another folder, for example while testing.
+ */
 public final class FileLevelRepository implements LevelRepository {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileLevelRepository.class);
@@ -32,8 +35,11 @@ public final class FileLevelRepository implements LevelRepository {
     }
 
     public static FileLevelRepository inHomeDirectory() {
-        return new FileLevelRepository(
-                Path.of(System.getProperty("user.home"), ".blastarena", "levels"), new LevelCodec());
+        String override = System.getenv("BLASTARENA_LEVELS");
+        Path directory = override != null && !override.isBlank()
+                ? Path.of(override)
+                : Path.of(System.getProperty("user.home"), ".blastarena", "levels");
+        return new FileLevelRepository(directory, new LevelCodec());
     }
 
     public Path directory() {
@@ -56,11 +62,11 @@ public final class FileLevelRepository implements LevelRepository {
 
     @Override
     public Optional<LevelData> load(String name) throws IOException, LevelFormatException {
-        Path file = fileFor(name);
-        if (!Files.exists(file)) {
+        Optional<Path> file = find(name);
+        if (file.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(codec.decode(Files.readString(file, StandardCharsets.UTF_8)));
+        return Optional.of(codec.decode(Files.readString(file.get(), StandardCharsets.UTF_8)));
     }
 
     @Override
@@ -84,7 +90,34 @@ public final class FileLevelRepository implements LevelRepository {
 
     @Override
     public boolean delete(String name) throws IOException {
-        return Files.deleteIfExists(fileFor(name));
+        Optional<Path> file = find(name);
+        return file.isPresent() && Files.deleteIfExists(file.get());
+    }
+
+    /**
+     * The file holding the level with this name: normally the one named after it, but a file copied in under
+     * another name is found by reading the level names inside.
+     */
+    private Optional<Path> find(String name) throws IOException {
+        Path expected = fileFor(name);
+        if (Files.exists(expected)) {
+            return Optional.of(expected);
+        }
+        if (!Files.isDirectory(directory)) {
+            return Optional.empty();
+        }
+        try (Stream<Path> files = Files.list(directory)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(EXTENSION)).toList()) {
+                try {
+                    if (codec.decode(Files.readString(file, StandardCharsets.UTF_8)).name().equals(name)) {
+                        return Optional.of(file);
+                    }
+                } catch (LevelFormatException | IOException e) {
+                    // Unreadable files cannot hold the level we want.
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     @Override

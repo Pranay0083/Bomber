@@ -9,15 +9,14 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.blastarena.core.board.MapGenerator;
 import com.blastarena.core.bot.BotController;
 import com.blastarena.core.bot.Difficulty;
 import com.blastarena.core.control.Controller;
 import com.blastarena.core.engine.GameEngine;
 import com.blastarena.core.engine.GameWorld;
 import com.blastarena.core.event.SynchronousEventPublisher;
+import com.blastarena.core.level.Arena;
 import com.blastarena.core.level.MapSource;
-import com.blastarena.core.level.RandomMapSource;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.desktop.input.KeyboardController;
@@ -32,22 +31,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Plays rounds: runs the engine on a fixed 50 ms tick and draws the world every frame.
- * Player 1 is on the keyboard against three Medium bots. R starts a new round once one is over; Esc quits.
+ * Plays rounds on a map: runs the engine on a fixed 50 ms tick and draws the world every frame.
+ * Player 1 is on the keyboard against Medium bots, one per remaining spawn up to three.
+ * R starts a new round once one is over; Esc leaves.
  */
 public final class GameScreen extends ScreenAdapter {
 
     private static final Logger LOG = LoggerFactory.getLogger(GameScreen.class);
-    private static final int PLAYER_COUNT = 4;
-
+    private static final int MAX_PLAYERS = 4;
     private static final PlayerId HUMAN = new PlayerId(1);
 
+    private final MapSource mapSource;
+    private final Runnable onExit;
     private final FixedStepClock clock = new FixedStepClock(1f / GameConfig.TICKS_PER_SECOND);
-    private final Layout layout;
     private final OrthographicCamera camera = new OrthographicCamera();
-    private final Viewport viewport;
-    private final BoardRenderer boardRenderer;
-    private final HudRenderer hudRenderer;
     private final InputAdapter screenKeys = new InputAdapter() {
         @Override
         public boolean keyDown(int keycode) {
@@ -56,37 +53,37 @@ public final class GameScreen extends ScreenAdapter {
                 return true;
             }
             if (keycode == Keys.ESCAPE) {
-                Gdx.app.exit();
+                onExit.run();
                 return true;
             }
             return false;
         }
     };
-    private final MapSource mapSource = new RandomMapSource(new MapGenerator());
+    private Layout layout;
+    private Viewport viewport;
+    private BoardRenderer boardRenderer;
+    private HudRenderer hudRenderer;
     private GameEngine engine;
     private KeyboardController keyboard;
     private AnimationListener animation;
 
-    public GameScreen(Layout layout) {
-        this.layout = layout;
-        this.viewport = new FitViewport(layout.boardWidth(), layout.totalHeight(), camera);
-        this.boardRenderer = new BoardRenderer(layout);
-        this.hudRenderer = new HudRenderer(layout, HUMAN);
+    public GameScreen(MapSource mapSource, Runnable onExit) {
+        this.mapSource = mapSource;
+        this.onExit = onExit;
         startRound();
     }
 
     private void startRound() {
-        GameConfig config = GameConfig.builder()
-                .width(layout.columns())
-                .height(layout.rows())
-                .seed(System.nanoTime())
-                .build();
-        GameWorld world = GameWorld.forArena(config, mapSource.createArena(config), PLAYER_COUNT);
+        GameConfig config = GameConfig.builder().seed(System.nanoTime()).build();
+        Arena arena = mapSource.createArena(config);
+        useLayoutFor(arena);
+        int players = Math.min(MAX_PLAYERS, arena.board().spawns().size());
+        GameWorld world = GameWorld.forArena(config, arena, players);
 
         keyboard = new KeyboardController(HUMAN);
         Map<PlayerId, Controller> controllers = new HashMap<>();
         controllers.put(HUMAN, keyboard);
-        for (int id = 2; id <= PLAYER_COUNT; id++) {
+        for (int id = 2; id <= players; id++) {
             PlayerId bot = new PlayerId(id);
             controllers.put(bot, BotController.of(Difficulty.MEDIUM, bot, config.seed() + id));
         }
@@ -97,6 +94,25 @@ public final class GameScreen extends ScreenAdapter {
         publisher.subscribe(animation);
         clock.reset();
         LOG.info("New round, seed {}", config.seed());
+    }
+
+    /** Custom levels can be any size, so the drawing is set up for each board. */
+    private void useLayoutFor(Arena arena) {
+        Layout wanted = Layout.forBoard(arena.board().width(), arena.board().height());
+        if (wanted.equals(layout)) {
+            return;
+        }
+        disposeRenderers();
+        layout = wanted;
+        viewport = new FitViewport(layout.boardWidth(), layout.totalHeight(), camera);
+        viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
+        boardRenderer = new BoardRenderer(layout);
+        hudRenderer = new HudRenderer(layout, HUMAN);
+    }
+
+    @Override
+    public void show() {
+        Gdx.input.setInputProcessor(new InputMultiplexer(screenKeys, keyboard));
     }
 
     @Override
@@ -118,7 +134,13 @@ public final class GameScreen extends ScreenAdapter {
 
     @Override
     public void dispose() {
-        boardRenderer.dispose();
-        hudRenderer.dispose();
+        disposeRenderers();
+    }
+
+    private void disposeRenderers() {
+        if (boardRenderer != null) {
+            boardRenderer.dispose();
+            hudRenderer.dispose();
+        }
     }
 }
