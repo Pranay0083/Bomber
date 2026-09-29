@@ -55,29 +55,9 @@ public final class BoardRenderer implements Disposable {
                 float left = layout.screenX(x);
                 float bottom = layout.screenY(y);
                 switch (view.tileAt(new Position(x, y))) {
-                    case Floor floor -> {
-                        shapes.setColor((x + y) % 2 == 0 ? Palette.FLOOR : Palette.FLOOR_ALT);
-                        shapes.rect(left, bottom, size, size);
-                    }
-                    case SolidWall wall -> {
-                        shapes.setColor(Palette.WALL_DARK);
-                        shapes.rect(left, bottom, size, size);
-                        shapes.setColor(Palette.WALL);
-                        shapes.rect(left + 3, bottom + 6, size - 6, size - 9);
-                        shapes.setColor(Palette.WALL_LIGHT);
-                        shapes.rect(left + 3, bottom + size - 9, size - 6, 6);
-                    }
-                    case Crate crate -> {
-                        shapes.setColor(Palette.FLOOR);
-                        shapes.rect(left, bottom, size, size);
-                        shapes.setColor(Palette.CRATE_DARK);
-                        shapes.rect(left + 4, bottom + 4, size - 8, size - 8);
-                        shapes.setColor(Palette.CRATE);
-                        shapes.rect(left + 8, bottom + 8, size - 16, size - 16);
-                        shapes.setColor(Palette.CRATE_DARK);
-                        shapes.rectLine(left + 10, bottom + 10, left + size - 10, bottom + size - 10, 5);
-                        shapes.rectLine(left + 10, bottom + size - 10, left + size - 10, bottom + 10, 5);
-                    }
+                    case Floor floor -> TileArt.floor(shapes, left, bottom, size, x, y);
+                    case SolidWall wall -> TileArt.wall(shapes, left, bottom, size);
+                    case Crate crate -> TileArt.crate(shapes, left, bottom, size, x, y);
                 }
             }
         }
@@ -86,12 +66,8 @@ public final class BoardRenderer implements Disposable {
     private void drawPowerUps(WorldView view) {
         float size = layout.tileSize();
         for (Map.Entry<Position, PowerUpType> entry : view.powerUps().entrySet()) {
-            float cx = layout.screenX(entry.getKey().x()) + size / 2;
-            float cy = layout.screenY(entry.getKey().y()) + size / 2;
-            shapes.setColor(Palette.POWER_UP_BASE);
-            shapes.rect(cx - size * 0.32f, cy - size * 0.32f, size * 0.64f, size * 0.64f);
-            shapes.setColor(Palette.powerUp(entry.getValue()));
-            shapes.circle(cx, cy, size * 0.24f, 24);
+            TileArt.powerUp(shapes, layout.screenX(entry.getKey().x()), layout.screenY(entry.getKey().y()), size,
+                    entry.getValue());
         }
     }
 
@@ -142,12 +118,7 @@ public final class BoardRenderer implements Disposable {
         font.getData().setScale(1.3f);
         font.setColor(Palette.POWER_UP_BASE);
         for (Map.Entry<Position, PowerUpType> entry : view.powerUps().entrySet()) {
-            String letter = switch (entry.getValue()) {
-                case EXTRA_BOMB -> "B";
-                case BLAST_RANGE -> "R";
-                case SPEED -> "S";
-            };
-            drawCentred(letter, layout.screenX(entry.getKey().x()) + size / 2,
+            drawCentred(TileArt.powerUpLetter(entry.getValue()), layout.screenX(entry.getKey().x()) + size / 2,
                     layout.screenY(entry.getKey().y()) + size / 2);
         }
     }

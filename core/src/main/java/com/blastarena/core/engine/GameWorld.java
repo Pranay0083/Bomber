@@ -7,6 +7,7 @@ import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.entity.Fire;
 import com.blastarena.core.entity.Player;
 import com.blastarena.core.entity.PowerUpDrop;
+import com.blastarena.core.level.Arena;
 import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
@@ -52,6 +53,13 @@ public final class GameWorld {
             players.add(new Player(new PlayerId(i + 1), spawns.get(i)));
         }
         return new GameWorld(config, board, players);
+    }
+
+    /** Creates players 1 to {@code playerCount} on the arena's spawns, with its starting power-ups on the floor. */
+    public static GameWorld forArena(GameConfig config, Arena arena, int playerCount) {
+        GameWorld world = withPlayersOnSpawns(config, arena.board(), playerCount);
+        arena.powerUps().forEach((position, type) -> world.addDrop(new PowerUpDrop(position, type.create())));
+        return world;
     }
 
     public GameConfig config() {

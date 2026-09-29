@@ -7,9 +7,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -101,6 +103,26 @@ public final class PathFinder {
             previous = next;
         }
         return !steps.isEmpty() || !danger.isDeadlyFrom(start, 1);
+    }
+
+    /**
+     * Every tile reachable from {@code start} through tiles that {@code open} accepts, ignoring time and danger.
+     * Used where only the shape of the map matters, such as checking that a level's spawns connect.
+     */
+    public static Set<Position> reachable(Position start, Predicate<Position> open) {
+        Set<Position> seen = new HashSet<>();
+        Deque<Position> queue = new ArrayDeque<>();
+        seen.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            for (Position next : queue.removeFirst().neighbours()) {
+                if (!seen.contains(next) && open.test(next)) {
+                    seen.add(next);
+                    queue.addLast(next);
+                }
+            }
+        }
+        return seen;
     }
 
     /** On the board, walkable, and without a bomb. */
