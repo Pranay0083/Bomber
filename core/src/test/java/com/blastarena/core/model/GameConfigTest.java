@@ -21,6 +21,7 @@ class GameConfigTest {
         assertThat(config.crateDensity()).isEqualTo(0.7);
         assertThat(config.roundLengthTicks()).isEqualTo(2400);
         assertThat(config.countdownTicks()).isEqualTo(60);
+        assertThat(config.suddenDeathIntervalTicks()).isEqualTo(5);
     }
 
     @Test

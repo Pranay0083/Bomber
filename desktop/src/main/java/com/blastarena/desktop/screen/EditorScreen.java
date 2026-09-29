@@ -34,6 +34,8 @@ import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.Position;
 import com.blastarena.core.powerup.PowerUpType;
 import com.blastarena.desktop.render.Palette;
+import com.blastarena.desktop.render.Sprite;
+import com.blastarena.desktop.render.SpriteSheet;
 import com.blastarena.desktop.render.TileArt;
 import com.blastarena.desktop.ui.Button;
 import com.blastarena.desktop.ui.ButtonBar;
@@ -81,6 +83,7 @@ public final class EditorScreen extends ScreenAdapter {
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
     private final BitmapFont font = new BitmapFont();
+    private final SpriteSheet sheet = new SpriteSheet();
     private final ButtonBar buttons = new ButtonBar();
 
     private List<LevelProblem> problems = List.of();
@@ -455,9 +458,12 @@ public final class EditorScreen extends ScreenAdapter {
         float panelLeft = WIDTH - PANEL_WIDTH;
         layOutButtons(panelLeft + MARGIN, HEIGHT - 100);
 
+        batch.begin();
+        drawCells();
+        batch.end();
+
         Gdx.gl.glEnable(GL20.GL_BLEND);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        drawCells();
         drawPreview();
         shapes.setColor(Palette.HUD);
         shapes.rect(panelLeft, 0, PANEL_WIDTH, HEIGHT);
@@ -469,7 +475,6 @@ public final class EditorScreen extends ScreenAdapter {
         shapes.end();
 
         batch.begin();
-        drawPowerUpLetters();
         drawPanelText(panelLeft + MARGIN);
         buttons.drawLabels(batch, font);
         batch.end();
@@ -483,13 +488,19 @@ public final class EditorScreen extends ScreenAdapter {
                 float left = cellLeft(x);
                 float bottom = cellBottom(y);
                 switch (level.cellAt(position)) {
-                    case FLOOR -> TileArt.floor(shapes, left, bottom, size, x, y);
-                    case WALL -> TileArt.wall(shapes, left, bottom, size);
-                    case CRATE -> TileArt.crate(shapes, left, bottom, size, x, y);
-                    case SPAWN -> TileArt.spawn(shapes, left, bottom, size, x, y);
-                    case CRATE_ZONE -> TileArt.crateZone(shapes, left, bottom, size, x, y);
+                    case FLOOR -> TileArt.floor(batch, sheet, left, bottom, size, x, y);
+                    case WALL -> TileArt.wall(batch, sheet, left, bottom, size);
+                    case CRATE -> TileArt.crate(batch, sheet, left, bottom, size);
+                    case SPAWN -> {
+                        TileArt.floor(batch, sheet, left, bottom, size, x, y);
+                        TileArt.draw(batch, sheet, Sprite.SPAWN_MARKER, left, bottom, size);
+                    }
+                    case CRATE_ZONE -> {
+                        TileArt.floor(batch, sheet, left, bottom, size, x, y);
+                        TileArt.draw(batch, sheet, Sprite.CRATE_ZONE, left, bottom, size);
+                    }
                 }
-                level.powerUpAt(position).ifPresent(type -> TileArt.powerUp(shapes, left, bottom, size, type));
+                level.powerUpAt(position).ifPresent(type -> TileArt.powerUp(batch, sheet, left, bottom, size, type));
             }
         }
     }
@@ -516,21 +527,6 @@ public final class EditorScreen extends ScreenAdapter {
             for (Position cell : tool().cells(level, hover, hover)) {
                 if (!(baseTool instanceof FillTool)) {
                     shapes.rect(cellLeft(cell.x()), cellBottom(cell.y()), size, size);
-                }
-            }
-        }
-    }
-
-    private void drawPowerUpLetters() {
-        float size = tileSize();
-        font.getData().setScale(Math.max(0.8f, size / 48f));
-        font.setColor(Palette.POWER_UP_BASE);
-        for (int y = 0; y < level.height(); y++) {
-            for (int x = 0; x < level.width(); x++) {
-                Optional<PowerUpType> type = level.powerUpAt(new Position(x, y));
-                if (type.isPresent()) {
-                    font.draw(batch, TileArt.powerUpLetter(type.get()), cellLeft(x) + size * 0.38f,
-                            cellBottom(y) + size * 0.64f);
                 }
             }
         }
@@ -574,5 +570,6 @@ public final class EditorScreen extends ScreenAdapter {
         shapes.dispose();
         batch.dispose();
         font.dispose();
+        sheet.dispose();
     }
 }

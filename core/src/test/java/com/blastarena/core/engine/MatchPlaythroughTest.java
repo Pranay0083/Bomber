@@ -6,7 +6,6 @@ import com.blastarena.core.board.MapGenerator;
 import com.blastarena.core.bot.BotController;
 import com.blastarena.core.bot.Difficulty;
 import com.blastarena.core.control.Controller;
-import com.blastarena.core.event.RoundEnded;
 import com.blastarena.core.event.SynchronousEventPublisher;
 import com.blastarena.core.level.RandomMapSource;
 import com.blastarena.core.model.GameConfig;
@@ -19,8 +18,8 @@ import org.junit.jupiter.api.Test;
 /** A whole best-of-3 match between bots, round after round, the way the desktop client plays one. */
 class MatchPlaythroughTest {
 
-    /** Sudden-death walls arrive in Phase 10; until then a round that runs this long is called a draw. */
-    private static final int ROUND_TICK_LIMIT = 4000;
+    /** Sudden death fills the arena well before this; the limit only stops a broken engine looping forever. */
+    private static final int ROUND_TICK_LIMIT = 6000;
     private static final int MAX_ROUNDS = 15;
 
     @Test
@@ -40,7 +39,8 @@ class MatchPlaythroughTest {
             while (!engine.isRoundOver() && engine.tickCount() < ROUND_TICK_LIMIT) {
                 engine.tick();
             }
-            match.recordRound(engine.phase() instanceof RoundOver over ? over.result() : RoundEnded.draw());
+            assertThat(engine.isRoundOver()).as("round %d ended on its own", match.currentRound()).isTrue();
+            match.recordRound(((RoundOver) engine.phase()).result());
         }
 
         assertThat(match.isOver()).isTrue();

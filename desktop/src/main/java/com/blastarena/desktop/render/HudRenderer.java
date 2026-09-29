@@ -116,13 +116,14 @@ public final class HudRenderer implements Disposable {
 
     private Banner bannerFor(GamePhase phase, MatchHud match) {
         if (match.paused()) {
-            return new Banner("Paused", "P resume     R restart round     Q quit to menu");
+            return new Banner("Paused", "P resume    R restart round    Q quit to menu    M sound "
+                    + (match.muted() ? "on" : "off"));
         }
         return switch (phase) {
             case Countdown countdown -> new Banner(
                     "Round " + match.round() + "   "
                             + (countdown.ticksLeft() + GameConfig.TICKS_PER_SECOND - 1) / GameConfig.TICKS_PER_SECOND,
-                    "Arrows move   Space drops a bomb   P pauses");
+                    "Arrows move   Space drops a bomb   P pauses   M mutes");
             case RoundOver over -> {
                 String title = over.result().winner().map(this::roundWinText).orElse("Draw!");
                 String next = match.matchWinner()

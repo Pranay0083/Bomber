@@ -128,6 +128,22 @@ final class EngineWorldView implements WorldView {
         return left;
     }
 
+    @Override
+    public List<Position> upcomingWalls() {
+        return SuddenDeath.remainingWalls(world);
+    }
+
+    @Override
+    public int ticksUntilNextWall() {
+        int interval = world.config().suddenDeathIntervalTicks();
+        return switch (engine.phase()) {
+            case Countdown countdown -> countdown.ticksLeft() + countdown.roundLengthTicks() + 1;
+            case Playing playing -> playing.roundLengthTicks() - playing.elapsedTicks() + 1;
+            case SuddenDeath suddenDeath -> suddenDeath.ticksUntilNextWall(interval);
+            case RoundOver over -> Integer.MAX_VALUE;
+        };
+    }
+
     private static PlayerSnapshot snapshot(Player player) {
         return new PlayerSnapshot(
                 player.id(),

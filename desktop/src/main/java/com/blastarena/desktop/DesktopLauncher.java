@@ -14,6 +14,7 @@ import com.blastarena.desktop.screen.MenuScreen;
 import com.blastarena.desktop.screen.Navigator;
 import com.blastarena.desktop.storage.FileLevelRepository;
 import java.util.List;
+import org.lwjgl.system.Configuration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -23,6 +24,7 @@ import java.util.function.Consumer;
  * {@code --start=menu|editor|random}, {@code --play=<level name>}, {@code --edit=<level name>},
  * {@code --bots=1..3}, {@code --difficulty=easy|medium|hard}, {@code --best-of=1|3|5},
  * {@code --autoplay} to put a bot in your seat and run the match by itself, {@code --speed=<n>} to run faster,
+ * {@code --mute} to start with sound off (screenshot runs are always muted),
  * and {@code --screenshot=<file.png> [--screenshot-after=<seconds>]} to save one frame and quit.
  */
 public final class DesktopLauncher {
@@ -31,6 +33,20 @@ public final class DesktopLauncher {
     private static final float DEFAULT_SCREENSHOT_SECONDS = 4f;
 
     private DesktopLauncher() {
+    }
+
+    /**
+     * On macOS, GLFW normally needs the JVM started with -XstartOnFirstThread, which a double-clicked jar cannot
+     * ask for. LWJGL ships glfw_async for this case: it runs GLFW's work on the main thread that AWT owns,
+     * so AWT is started first.
+     */
+    private static void allowStartingWithoutFirstThreadOnMac() {
+        boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+        boolean onFirstThread = "1".equals(System.getenv("JAVA_STARTED_ON_FIRST_THREAD_" + ProcessHandle.current().pid()));
+        if (mac && !onFirstThread) {
+            Configuration.GLFW_LIBRARY_NAME.set("glfw_async");
+            java.awt.Toolkit.getDefaultToolkit();
+        }
     }
 
     private static String option(String[] args, String name) {
@@ -44,6 +60,7 @@ public final class DesktopLauncher {
     }
 
     public static void main(String[] args) {
+        allowStartingWithoutFirstThreadOnMac();
         FileLevelRepository repository = FileLevelRepository.inHomeDirectory();
 
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
@@ -64,7 +81,8 @@ public final class DesktopLauncher {
         String speed = option(args, "speed");
         new Lwjgl3Application(new BlastArenaGame(repository, settings(args), autoplay,
                 speed == null ? 1f : Float.parseFloat(speed),
-                firstScreen(args, repository), screenshot, screenshotAfter), config);
+                firstScreen(args, repository), screenshot, screenshotAfter)
+                .muted(screenshot != null || List.of(args).contains("--mute")), config);
     }
 
     private static MatchSettings settings(String[] args) {

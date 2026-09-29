@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Burn power-ups the blasts reached, then destroy the crates they hit and roll a drop for each.</li>
  *   <li>Count down the fire that existed before this tick and remove what burned out.</li>
  *   <li>Kill players standing in fire.</li>
- *   <li>Let the current phase move on (round timer, win check).</li>
+ *   <li>Let the current phase move on (round timer, sudden-death walls, win check).</li>
  *   <li>Publish every event collected during the tick.</li>
  * </ol>
  */
@@ -111,7 +111,7 @@ public final class GameEngine {
             killPlayersInFire(events);
         }
 
-        GamePhase next = phase.next(new PhaseContext(world, rules.winConditionChecker()));
+        GamePhase next = phase.next(new PhaseContext(world, rules.winConditionChecker(), events::add));
         if (next instanceof RoundOver over) {
             events.add(over.result());
             LOG.debug("Round over after {} ticks: {}", tickCount, over.result());

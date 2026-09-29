@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.blastarena.core.control.BombSnapshot;
 import com.blastarena.core.control.WorldView;
+import com.blastarena.core.model.GameConfig;
 import com.blastarena.core.model.PlayerId;
 import com.blastarena.core.model.Position;
 import com.blastarena.core.testing.BotWorlds;
@@ -154,5 +155,32 @@ class DangerMapTest {
         assertThat(DangerMap.of(engine.view()).isDeadlyAt(burning, 1)).isFalse();
         engine.tick();
         assertThat(engine.view().burningTiles()).isEmpty();
+    }
+
+    @Test
+    void tilesAboutToBeWalledInAreDeadlyFromThenOn() {
+        GameConfig config = GameConfig.builder().countdownTicks(0).roundLengthTicks(1).suddenDeathIntervalTicks(4).build();
+        var engine = BotWorlds.engine(config,
+                "#######",
+                "#1....#",
+                "#.#.#.#",
+                "#....2#",
+                "#######");
+        engine.tick();
+        DangerMap danger = DangerMap.of(engine.view());
+
+        assertThat(danger.ticksUntilWall(new Position(1, 1))).isEqualTo(1);
+        assertThat(danger.ticksUntilWall(new Position(2, 1))).isEqualTo(5);
+        assertThat(danger.isDeadlyAt(new Position(2, 1), 4)).isFalse();
+        assertThat(danger.isDeadlyFrom(new Position(2, 1), 900)).isTrue();
+        assertThat(danger.isThreatened(new Position(1, 1))).isTrue();
+    }
+
+    @Test
+    void wallsFarInTheFutureDoNotCountYet() {
+        DangerMap danger = DangerMap.of(BotWorlds.view("#####", "#1.2#", "#####"));
+
+        assertThat(danger.ticksUntilWall(new Position(1, 1))).isEqualTo(DangerMap.NEVER);
+        assertThat(danger.isThreatened(new Position(2, 1))).isFalse();
     }
 }

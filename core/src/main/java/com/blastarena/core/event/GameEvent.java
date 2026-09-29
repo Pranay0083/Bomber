@@ -6,5 +6,5 @@ package com.blastarena.core.event;
  */
 public sealed interface GameEvent
         permits PlayerMoved, BombPlaced, BombExploded, CrateDestroyed, PowerUpDropped, PowerUpCollected,
-                PowerUpBurned, PlayerDied, RoundEnded {
+                PowerUpBurned, PlayerDied, WallDropped, RoundEnded {
 }

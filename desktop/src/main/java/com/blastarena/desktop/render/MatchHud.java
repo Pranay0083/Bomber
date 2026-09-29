@@ -10,7 +10,8 @@ import java.util.Optional;
  * @param wins        round wins so far for each player
  * @param paused      whether the game is paused
  * @param matchWinner set once the match is decided
+ * @param muted       whether sound is off
  */
 public record MatchHud(int round, int bestOf, Map<PlayerId, Integer> wins, boolean paused,
-                       Optional<PlayerId> matchWinner) {
+                       Optional<PlayerId> matchWinner, boolean muted) {
 }

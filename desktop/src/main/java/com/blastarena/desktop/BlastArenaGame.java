@@ -7,6 +7,7 @@ import com.blastarena.core.engine.Match;
 import com.blastarena.core.level.EditableLevel;
 import com.blastarena.core.level.LevelRepository;
 import com.blastarena.core.level.MapSource;
+import com.blastarena.desktop.audio.SoundEffects;
 import com.blastarena.desktop.render.Screenshots;
 import com.blastarena.desktop.screen.EditorScreen;
 import com.blastarena.desktop.screen.GameScreen;
@@ -33,6 +34,8 @@ public class BlastArenaGame extends Game implements Navigator {
     private MatchSettings settings;
     private final boolean autoplay;
     private final float speed;
+    private boolean startMuted;
+    private SoundEffects sounds;
 
     /**
      * @param firstScreen    opens the first screen, normally the menu
@@ -50,9 +53,20 @@ public class BlastArenaGame extends Game implements Navigator {
         this.screenshotAfterSeconds = screenshotAfterSeconds;
     }
 
+    /** Starts with sound muted; M in a game turns it back on. */
+    public BlastArenaGame muted(boolean muted) {
+        this.startMuted = muted;
+        return this;
+    }
+
     @Override
     public void create() {
         LOG.info("Blast Arena started");
+        sounds = SoundEffects.load(Gdx.audio != null);
+        if (startMuted) {
+            sounds.toggleMute();
+        }
+        LOG.info("Sound effects {}", sounds.isLoaded() ? (sounds.isMuted() ? "loaded, muted" : "loaded") : "off");
         firstScreen.accept(this);
     }
 
@@ -74,7 +88,7 @@ public class BlastArenaGame extends Game implements Navigator {
     @Override
     public void play(MapSource mapSource, MatchSettings matchSettings, Runnable onExit) {
         boolean fromEditor = getScreen() instanceof EditorScreen;
-        switchTo(new GameScreen(this, mapSource, matchSettings, onExit, autoplay, speed), fromEditor);
+        switchTo(new GameScreen(this, mapSource, matchSettings, onExit, sounds, autoplay, speed), fromEditor);
     }
 
     @Override
@@ -139,6 +153,9 @@ public class BlastArenaGame extends Game implements Navigator {
         }
         if (parked != null) {
             parked.dispose();
+        }
+        if (sounds != null) {
+            sounds.dispose();
         }
     }
 }
