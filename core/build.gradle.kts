@@ -11,9 +11,10 @@ java {
 val mockitoAgent = configurations.create("mockitoAgent")
 
 dependencies {
-    // core depends on nothing but the JDK and SLF4J (Jackson arrives in Phase 8).
+    // core depends on nothing but the JDK, SLF4J, and Jackson for level files.
     // LibGDX must never be added here.
     api(libs.slf4j.api)
+    implementation(libs.jackson.databind)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
