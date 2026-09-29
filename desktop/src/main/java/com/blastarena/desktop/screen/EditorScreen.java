@@ -8,6 +8,7 @@ import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.blastarena.desktop.ui.UiFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
@@ -82,7 +83,7 @@ public final class EditorScreen extends ScreenAdapter {
     private final Viewport viewport = new FitViewport(WIDTH, HEIGHT, camera);
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = UiFont.create();
     private final SpriteSheet sheet = new SpriteSheet();
     private final ButtonBar buttons = new ButtonBar();
 
@@ -533,11 +534,11 @@ public final class EditorScreen extends ScreenAdapter {
     }
 
     private void drawPanelText(float left) {
-        font.getData().setScale(1.5f);
+        font.getData().setScale(UiFont.NORMAL);
         font.setColor(Palette.TEXT);
         String name = renaming != null ? renaming + "_" : level.name() + (hasUnsavedChanges() ? " *" : "");
         font.draw(batch, name, left, HEIGHT - 22);
-        font.getData().setScale(1.05f);
+        font.getData().setScale(UiFont.SMALL);
         font.setColor(Palette.TEXT_DIM);
         font.draw(batch, level.width() + " x " + level.height() + "   crate zones "
                 + Math.round(level.crateDensity() * 100) + "%", left, HEIGHT - 50);

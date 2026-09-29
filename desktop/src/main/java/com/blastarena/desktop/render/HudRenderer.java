@@ -3,6 +3,7 @@ package com.blastarena.desktop.render;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.blastarena.desktop.ui.UiFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -30,7 +31,7 @@ public final class HudRenderer implements Disposable {
 
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = UiFont.create();
     private final GlyphLayout glyphs = new GlyphLayout();
     private final Layout layout;
     private final PlayerId humanPlayer;
@@ -60,7 +61,7 @@ public final class HudRenderer implements Disposable {
         shapes.end();
 
         batch.begin();
-        font.getData().setScale(1.2f);
+        font.getData().setScale(UiFont.SMALL);
         view.player(humanPlayer).ifPresent(player -> {
             font.setColor(player.alive() ? Palette.TEXT : Palette.TEXT_DIM);
             font.draw(batch, statsLine(player), 12, top - 17);
@@ -71,10 +72,10 @@ public final class HudRenderer implements Disposable {
         font.draw(batch, glyphs, layout.boardWidth() * 0.55f - glyphs.width / 2, top - 17);
 
         if (banner != null) {
-            font.getData().setScale(2.6f);
+            font.getData().setScale(UiFont.LARGE);
             glyphs.setText(font, banner.title());
             font.draw(batch, glyphs, layout.boardWidth() / 2 - glyphs.width / 2, middle + 40);
-            font.getData().setScale(1.3f);
+            font.getData().setScale(UiFont.SMALL);
             font.setColor(Palette.TEXT_DIM);
             glyphs.setText(font, banner.subtitle());
             font.draw(batch, glyphs, layout.boardWidth() / 2 - glyphs.width / 2, middle - 24);

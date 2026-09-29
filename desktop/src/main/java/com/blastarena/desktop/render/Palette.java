@@ -23,6 +23,12 @@ public final class Palette {
     public static final Color BUTTON = Color.valueOf("1f2937");
     public static final Color BUTTON_SELECTED = Color.valueOf("2563eb");
     public static final Color BUTTON_DISABLED = Color.valueOf("1a2130");
+    public static final Color BUTTON_EDGE = Color.valueOf("374151");
+    public static final Color BUTTON_SELECTED_EDGE = Color.valueOf("93c5fd");
+    public static final Color PANEL = new Color(0.07f, 0.09f, 0.14f, 0.92f);
+    public static final Color PANEL_EDGE = Color.valueOf("4b5563");
+    public static final Color ACCENT = Color.valueOf("fde047");
+    public static final Color DIM_OVERLAY = new Color(0.04f, 0.05f, 0.08f, 0.78f);
     public static final Color BOMB = Color.valueOf("111827");
     public static final Color BOMB_FLASH = Color.valueOf("dc2626");
     public static final Color BOMB_SHINE = Color.valueOf("6b7280");

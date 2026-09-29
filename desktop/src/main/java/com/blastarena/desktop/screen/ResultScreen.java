@@ -6,6 +6,7 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.blastarena.desktop.ui.UiFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -37,7 +38,7 @@ public final class ResultScreen extends ScreenAdapter {
     private final Viewport viewport = new FitViewport(WIDTH, HEIGHT, camera);
     private final ShapeRenderer shapes = new ShapeRenderer();
     private final SpriteBatch batch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font = UiFont.create();
     private final GlyphLayout glyphs = new GlyphLayout();
     private final ButtonBar buttons = new ButtonBar();
 
@@ -108,16 +109,16 @@ public final class ResultScreen extends ScreenAdapter {
         shapes.end();
 
         batch.begin();
-        font.getData().setScale(3f);
+        font.getData().setScale(UiFont.LARGE);
         font.setColor(Palette.FIRE_INNER);
         centred(winner.equals(HUMAN) ? "You win the match!" : "Player " + winner.id() + " wins the match", 640);
-        font.getData().setScale(1.3f);
+        font.getData().setScale(UiFont.SMALL);
         font.setColor(Palette.TEXT_DIM);
         centred(match.roundsPlayed() + " rounds played"
                 + (match.draws() > 0 ? ", " + match.draws() + (match.draws() == 1 ? " draw" : " draws") : "")
                 + "   best of " + match.bestOf() + " against " + settings.difficultyLabel() + " bots", 560);
         row = 0;
-        font.getData().setScale(1.5f);
+        font.getData().setScale(UiFont.NORMAL);
         for (Map.Entry<PlayerId, Integer> score : match.scores().entrySet()) {
             float y = rowTop - row * 54;
             font.setColor(Palette.TEXT);
@@ -126,7 +127,7 @@ public final class ResultScreen extends ScreenAdapter {
             font.draw(batch, Integer.toString(score.getValue()), WIDTH / 2 + 60, y - 7);
             row++;
         }
-        font.getData().setScale(1.3f);
+        font.getData().setScale(UiFont.SMALL);
         buttons.drawLabels(batch, font);
         batch.end();
     }
