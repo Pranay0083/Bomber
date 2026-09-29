@@ -31,8 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The main menu: play a random arena, start a new level, or pick a saved level to play, edit or delete.
- * Arrow keys choose, Enter plays, E edits, Delete deletes (press twice), N starts a new level, Esc quits.
+ * The main menu: choose the bots and match length, then play a random arena or a saved level,
+ * or edit, create and delete levels. Arrow keys choose, Enter plays, E edits, Delete deletes (press twice),
+ * N starts a new level, B, D and M change the bots, their difficulty and the match length, Esc quits.
  */
 public final class MenuScreen extends ScreenAdapter {
 
@@ -40,7 +41,8 @@ public final class MenuScreen extends ScreenAdapter {
     public static final float WIDTH = 832;
     public static final float HEIGHT = 752;
     private static final float ROW_HEIGHT = 34;
-    private static final int VISIBLE_ROWS = 12;
+    private static final int VISIBLE_ROWS = 10;
+    private static final float LIST_TOP = 470;
 
     /** One line of the list. Saved levels have their data; the random arena does not. */
     private record Entry(String label, String detail, Optional<LevelData> level, boolean playable) {
@@ -95,9 +97,9 @@ public final class MenuScreen extends ScreenAdapter {
     private void playSelected() {
         Entry entry = current();
         if (entry.level().isEmpty()) {
-            navigator.play(new RandomMapSource(new MapGenerator()), navigator::showMenu);
+            navigator.play(new RandomMapSource(new MapGenerator()), navigator.settings(), navigator::showMenu);
         } else if (entry.playable()) {
-            navigator.play(new CustomLevelSource(entry.level().get()), navigator::showMenu);
+            navigator.play(new CustomLevelSource(entry.level().get()), navigator.settings(), navigator::showMenu);
         } else {
             editSelected();
         }
@@ -149,6 +151,9 @@ public final class MenuScreen extends ScreenAdapter {
                     case Keys.ENTER, Keys.SPACE -> playSelected();
                     case Keys.E -> editSelected();
                     case Keys.N -> newLevel();
+                    case Keys.B -> navigator.changeSettings(navigator.settings().nextBotCount());
+                    case Keys.D -> navigator.changeSettings(navigator.settings().nextDifficulty());
+                    case Keys.M -> navigator.changeSettings(navigator.settings().nextMatchLength());
                     case Keys.FORWARD_DEL, Keys.DEL -> deleteSelected();
                     case Keys.ESCAPE -> Gdx.app.exit();
                     default -> {
@@ -183,12 +188,12 @@ public final class MenuScreen extends ScreenAdapter {
     }
 
     private float rowTop(int row) {
-        return 560 - (row - firstVisibleRow()) * ROW_HEIGHT;
+        return LIST_TOP - (row - firstVisibleRow()) * ROW_HEIGHT;
     }
 
     private int rowAt(float y) {
-        int offset = (int) Math.floor((560 - y) / ROW_HEIGHT);
-        return y > 560 || offset >= VISIBLE_ROWS ? -1 : firstVisibleRow() + offset;
+        int offset = (int) Math.floor((LIST_TOP - y) / ROW_HEIGHT);
+        return y > LIST_TOP || offset >= VISIBLE_ROWS ? -1 : firstVisibleRow() + offset;
     }
 
     @Override
@@ -205,6 +210,14 @@ public final class MenuScreen extends ScreenAdapter {
         buttons.add(Button.of("New level", 352, y, 140, 36, this::newLevel));
         buttons.add(Button.of("Delete", 508, y, 120, 36, this::deleteSelected).enabled(current().level().isPresent()));
         buttons.add(Button.of("Quit", 644, y, 108, 36, () -> Gdx.app.exit()));
+        MatchSettings settings = navigator.settings();
+        float settingsY = HEIGHT - 240;
+        buttons.add(Button.of("B  Bots: " + settings.bots(), 80, settingsY, 200, 36,
+                () -> navigator.changeSettings(navigator.settings().nextBotCount())));
+        buttons.add(Button.of("D  Bots are " + settings.difficultyLabel(), 296, settingsY, 240, 36,
+                () -> navigator.changeSettings(navigator.settings().nextDifficulty())));
+        buttons.add(Button.of("M  Best of " + settings.bestOf(), 552, settingsY, 200, 36,
+                () -> navigator.changeSettings(navigator.settings().nextMatchLength())));
 
         int first = firstVisibleRow();
         int last = Math.min(entries.size(), first + VISIBLE_ROWS);
@@ -225,6 +238,8 @@ public final class MenuScreen extends ScreenAdapter {
         font.draw(batch, "Arrows choose   Enter play   E edit   N new level   Delete remove   Esc quit",
                 80, HEIGHT - 130);
         font.draw(batch, "Levels are saved in ~/.blastarena/levels/", 80, HEIGHT - 156);
+        font.setColor(Palette.TEXT);
+        font.draw(batch, "Match", 80, HEIGHT - 190);
         for (int row = first; row < last; row++) {
             Entry entry = entries.get(row);
             float top = rowTop(row);

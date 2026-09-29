@@ -14,6 +14,8 @@ import com.blastarena.core.bot.Difficulty;
 import com.blastarena.core.control.Controller;
 import com.blastarena.core.engine.GameEngine;
 import com.blastarena.core.engine.GameWorld;
+import com.blastarena.core.engine.Match;
+import com.blastarena.core.engine.RoundOver;
 import com.blastarena.core.event.SynchronousEventPublisher;
 import com.blastarena.core.level.Arena;
 import com.blastarena.core.level.MapSource;
@@ -24,41 +26,45 @@ import com.blastarena.desktop.render.AnimationListener;
 import com.blastarena.desktop.render.BoardRenderer;
 import com.blastarena.desktop.render.HudRenderer;
 import com.blastarena.desktop.render.Layout;
+import com.blastarena.desktop.render.MatchHud;
 import com.blastarena.desktop.render.Palette;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Plays rounds on a map: runs the engine on a fixed 50 ms tick and draws the world every frame.
- * Player 1 is on the keyboard against Medium bots, one per remaining spawn up to three.
- * R starts a new round once one is over; Esc leaves.
+ * Plays a best-of-N match on a map: player 1 on the keyboard against bots, one round after another.
+ * Runs the engine on a fixed 50 ms tick and draws every frame.
+ *
+ * <p>P or Esc pauses; while paused R restarts the round and Q leaves. After a round, Enter starts the next one,
+ * and once the match is decided Enter shows the results.
  */
 public final class GameScreen extends ScreenAdapter {
 
     private static final Logger LOG = LoggerFactory.getLogger(GameScreen.class);
     private static final int MAX_PLAYERS = 4;
+    /** With autoplay on, how long a round result stays up before the next round starts by itself. */
+    private static final float AUTOPLAY_PAUSE_SECONDS = 2.5f;
     private static final PlayerId HUMAN = new PlayerId(1);
 
+    private final Navigator navigator;
     private final MapSource mapSource;
+    private final MatchSettings settings;
     private final Runnable onExit;
+    private final boolean autoplay;
+    private final float speed;
     private final FixedStepClock clock = new FixedStepClock(1f / GameConfig.TICKS_PER_SECOND);
     private final OrthographicCamera camera = new OrthographicCamera();
     private final InputAdapter screenKeys = new InputAdapter() {
         @Override
         public boolean keyDown(int keycode) {
-            if (keycode == Keys.R && engine.isRoundOver()) {
-                startRound();
-                return true;
-            }
-            if (keycode == Keys.ESCAPE) {
-                onExit.run();
-                return true;
-            }
-            return false;
+            return handleKey(keycode);
         }
     };
+    private Match match;
     private Layout layout;
     private Viewport viewport;
     private BoardRenderer boardRenderer;
@@ -66,10 +72,23 @@ public final class GameScreen extends ScreenAdapter {
     private GameEngine engine;
     private KeyboardController keyboard;
     private AnimationListener animation;
+    private boolean roundRecorded;
+    private boolean paused;
+    private float secondsSinceRoundOver;
 
-    public GameScreen(MapSource mapSource, Runnable onExit) {
+    /**
+     * @param autoplay put a Hard bot in player 1's seat and move on between rounds by itself,
+     *                 so a whole match can be watched or checked without anyone at the keyboard
+     * @param speed    how many times faster than real time the game runs; 1 for normal play
+     */
+    public GameScreen(Navigator navigator, MapSource mapSource, MatchSettings settings, Runnable onExit,
+                      boolean autoplay, float speed) {
+        this.navigator = navigator;
         this.mapSource = mapSource;
+        this.settings = settings;
         this.onExit = onExit;
+        this.autoplay = autoplay;
+        this.speed = speed;
         startRound();
     }
 
@@ -77,15 +96,22 @@ public final class GameScreen extends ScreenAdapter {
         GameConfig config = GameConfig.builder().seed(System.nanoTime()).build();
         Arena arena = mapSource.createArena(config);
         useLayoutFor(arena);
-        int players = Math.min(MAX_PLAYERS, arena.board().spawns().size());
+        int players = Math.min(Math.min(MAX_PLAYERS, settings.bots() + 1), arena.board().spawns().size());
         GameWorld world = GameWorld.forArena(config, arena, players);
+        if (match == null) {
+            List<PlayerId> ids = new ArrayList<>();
+            for (int id = 1; id <= players; id++) {
+                ids.add(new PlayerId(id));
+            }
+            match = new Match(settings.bestOf(), ids);
+        }
 
         keyboard = new KeyboardController(HUMAN);
         Map<PlayerId, Controller> controllers = new HashMap<>();
-        controllers.put(HUMAN, keyboard);
+        controllers.put(HUMAN, autoplay ? BotController.of(Difficulty.HARD, HUMAN, config.seed()) : keyboard);
         for (int id = 2; id <= players; id++) {
             PlayerId bot = new PlayerId(id);
-            controllers.put(bot, BotController.of(Difficulty.MEDIUM, bot, config.seed() + id));
+            controllers.put(bot, BotController.of(settings.difficulty(), bot, config.seed() + id));
         }
         Gdx.input.setInputProcessor(new InputMultiplexer(screenKeys, keyboard));
         SynchronousEventPublisher publisher = new SynchronousEventPublisher();
@@ -93,7 +119,47 @@ public final class GameScreen extends ScreenAdapter {
         animation = new AnimationListener(engine.view());
         publisher.subscribe(animation);
         clock.reset();
-        LOG.info("New round, seed {}", config.seed());
+        roundRecorded = false;
+        paused = false;
+        secondsSinceRoundOver = 0f;
+        LOG.info("Round {} of {}, seed {}", match.currentRound(), match.bestOf(), config.seed());
+    }
+
+    private void continueAfterRound() {
+        if (match.isOver()) {
+            navigator.showResults(match, mapSource, settings, onExit);
+        } else {
+            startRound();
+        }
+    }
+
+    private boolean handleKey(int keycode) {
+        if (engine.isRoundOver()) {
+            if (keycode == Keys.ENTER || keycode == Keys.SPACE) {
+                continueAfterRound();
+                return true;
+            }
+            if (keycode == Keys.ESCAPE || keycode == Keys.Q) {
+                onExit.run();
+                return true;
+            }
+            return false;
+        }
+        if (keycode == Keys.P || keycode == Keys.ESCAPE) {
+            paused = !paused;
+            clock.reset();
+            return true;
+        }
+        if (paused && keycode == Keys.R) {
+            startRound();
+            return true;
+        }
+        if (paused && keycode == Keys.Q) {
+            onExit.run();
+            return true;
+        }
+        // While paused, keep the keys from reaching the player.
+        return paused;
     }
 
     /** Custom levels can be any size, so the drawing is set up for each board. */
@@ -117,14 +183,38 @@ public final class GameScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
-        int ticks = clock.advance(delta);
-        for (int i = 0; i < ticks; i++) {
-            engine.tick();
+        if (!paused) {
+            int ticks = clock.advance(delta * speed);
+            for (int i = 0; i < ticks; i++) {
+                engine.tick();
+            }
+        }
+        if (engine.phase() instanceof RoundOver over && !roundRecorded) {
+            match.recordRound(over.result());
+            roundRecorded = true;
+            LOG.info("Round over: {}. Scores {}", over.result(), match.scores());
+        }
+        if (autoplay && roundRecorded) {
+            secondsSinceRoundOver += delta * speed;
+            if (secondsSinceRoundOver >= AUTOPLAY_PAUSE_SECONDS) {
+                continueAfterRound();
+                return;
+            }
         }
         ScreenUtils.clear(Palette.BACKGROUND);
         viewport.apply();
-        boardRenderer.draw(engine.view(), animation.placement(clock.alpha()), camera.combined);
-        hudRenderer.draw(engine.view(), camera.combined);
+        boardRenderer.draw(engine.view(), animation.placement(paused ? 0f : clock.alpha()), camera.combined);
+        hudRenderer.draw(engine.view(),
+                new MatchHud(match.currentRound(), match.bestOf(), match.scores(), paused, match.winner()),
+                camera.combined);
+    }
+
+    @Override
+    public void pause() {
+        // The window lost focus: stop the round rather than let the bots play on.
+        if (!engine.isRoundOver()) {
+            paused = true;
+        }
     }
 
     @Override
