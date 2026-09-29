@@ -7,7 +7,10 @@ import com.blastarena.core.engine.GameWorld;
 import com.blastarena.core.entity.Bomb;
 import com.blastarena.core.model.Direction;
 import com.blastarena.core.model.Position;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +23,34 @@ import java.util.Set;
  * they are triggered.
  */
 public final class ExplosionResolver {
+
+    /** Bombs that go off this tick: those whose fuse ran out and those sitting in fire, in placement order. */
+    public List<Bomb> bombsToExplode(GameWorld world) {
+        return world.bombs().stream()
+                .filter(bomb -> bomb.isDue() || world.isBurning(bomb.position()))
+                .toList();
+    }
+
+    /**
+     * Explodes the given bombs and every bomb their blasts trigger, until no new bomb is caught.
+     * Each bomb explodes once, in the order it was reached. Crates are not removed in between,
+     * so every blast in the chain is stopped by the same crates.
+     */
+    public List<Explosion> resolveChain(GameWorld world, List<Bomb> initial) {
+        List<Explosion> explosions = new ArrayList<>();
+        Set<Bomb> reached = new HashSet<>(initial);
+        Deque<Bomb> pending = new ArrayDeque<>(initial);
+        while (!pending.isEmpty()) {
+            Explosion explosion = resolve(world, pending.removeFirst());
+            explosions.add(explosion);
+            for (Bomb caught : explosion.triggered()) {
+                if (reached.add(caught)) {
+                    pending.addLast(caught);
+                }
+            }
+        }
+        return explosions;
+    }
 
     public Explosion resolve(GameWorld world, Bomb bomb) {
         Board board = world.board();
